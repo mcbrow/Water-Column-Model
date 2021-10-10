@@ -1,7 +1,10 @@
+# Package Load #
+
+source("/Users/michael/Desktop/PhD/Research Methods/Water Column Models/Water Column/Essentials/PackageList.R")
+
 #Simple model of vertical distribution of particles numbers in a water column
 
-library(tictoc)
-library(deSolve)
+
 
 # Driving data containing profile of Depths and Vertical Diffusivity
 DrivingData<-read.csv("/Users/michael/Desktop/PhD/Research/Water Column Model/DUMMY/data.csv") # or other path...
@@ -127,7 +130,7 @@ data2
 system("R CMD SHLIB DiffModel.c")
 dyn.load("DiffModel.so")
 
-
+getwd()
 
 parms<-c(z=z[1:length(z)], s=s[1:length(s)], r=r[1:length(r)], 
          m=m[1:length(m)], odechoice=1, sinkingchoice=1, growthchoice=1, n=57)
