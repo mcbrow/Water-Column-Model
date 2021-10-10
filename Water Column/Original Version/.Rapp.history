@@ -1,0 +1,1436 @@
+out[1001,]
+out[5000,]
+out[5001,]
+temp<-rep(NA,5001)#
+temp[1:5000]<-out[2:5001,length(z)+2]#
+out[,(length(z)+3)]<-temp-out[,(length(z)+2)]
+plot(out[,(length(z)+3)],type="l", ylab="Flux of particles", xlab="Time", main="Particle Flux from base of water column") # seabed flux
+out[,length(z)+4]<-rowSums(out[,2:(length(z)+1)]) # total depth integrated population in the water column#
+plot(out[,length(z)+4],type="l", ylab="No. of Particles", xlab="Time", main="Particles in water column") # depth integrated population
+model<-function(t,xx,parms){#
+  izmax<-length(xx)-1   # izmax = number of wet cells; xx[1]=time,xx[2:izmax+1]=particle numbers in each depth cell#
+  fz<-rep(0, izmax) # diffusion flux of particles between cells#
+  gz<-rep(0, izmax) # gravitational sinking flux of particles between cells#
+  rz<-rep(0, izmax) # replication flux of particles within cells#
+#
+   dxx<-list(c())#
+  with(as.list(parms),{#
+ #Assumes that kvert applies at the base of each layer  we expect kvert=0 at the sea surface#
+ 	kd<-rep(0, izmax) #
+    for(i in 2:(izmax)){#
+      kd[i] <- k[i-1]/(z[i-1]+z[i]) # vertical diffusivity gradient (m/unit time)#
+    }    #
+    md<-m/(z^2) # density dependent loss rate (/unit time)#
+      sd<-s/z     # gravitational loss rate  #
+    for(i in 2:(izmax-1)){#
+      fz[i]<-kd[i]*((xx[i]/z[i])-(xx[i-1]/z[i-1]))  # vertical diffusion flux = diffusivity gradient * concentration difference#
+      gz[i]<-sd[i]*xx[i]              # sinking flux = gravtiational loss rate * abundance#
+      rz[i]<-r[i]*xx[i]               # growth = growth rate * abundance#
+    }#
+    fz[1]<-0                              # Flux at the surface = 0 #
+    gz[1]<-(sd[1]*xx[1])                   # sinkingfrom the surface cell#
+    rz[1]<-(r[1]*xx[1])                   # growth in the surface cell#
+    fz[izmax]<-kd[izmax]*((xx[izmax]/z[izmax])-(xx[izmax-1]/z[izmax-1]))    # diffusion flux out of the bottom cell#
+    #-------------#
+    #Simplest option - a closed system (no export at the base) with no reproduction in the deepest layer#
+    # gz[izmax]<-0                      #no sinking export from the deepest layer#
+    # rz[izmax]<-0                      #no growth in the deepest layer#
+    #-------------#
+    #Option with an open system (export at the base) #
+    gz[izmax]<-(sd[izmax]*xx[izmax])   # export sinking out of the base of the model#
+    rz[izmax]<-(r[izmax]*xx[izmax])    # growth flux in the deepest cell#
+    #-------------#
+     # rate of change in abundance in surface cell#
+    dxx[[1]][1]<-assign("dxx1", (-fz[1]) + fz[2] - gz[1] + rz[1] - md[1]*(xx[1]^2))	#
+        # Assign function allows automation of setting up sequential variables.#
+    for(i in 2:(length(z)-1)){#
+    dxx[[1]][i]<-assign(paste0("dxx",i), (-fz[i] + fz[i+1] - gz[i] + gz[i-1] + rz[i] - md[i] * (xx[i])^2))#
+    }#
+     # dxx[[1]][length(z)]<-0 # closed no growth#
+   dxx[[1]][length(z)]<-assign(paste0("dxx", length(z)), (-fz[length(z)] - gz[length(z)] + gz[length(z)-1] + rz[length(z)] - md[length(z)] * xx[length(z)]^2))#
+   #  dxx[[1]][length(z)+1]<-0 # exit flux - closed#
+     dxx[[1]][length(z)+1]<-assign(paste0("dxx", length(z)+1), gz[length(z)])#
+    dxx#
+  })#
+}
+DrivingData<-read.csv("/Users/michael/Desktop/PhD/Research/Water Column Model/DUMMY/data.csv") # or other path...#
+DrivingData<-DrivingData[rowSums(DrivingData[,c(2,3)])!=0,] # removes rows of zeroes (these rows represent below the seabed)#
+times<-seq(0,5000,1)#
+Nz<-10 # fixed number of depth layers - in this code must = the hardwired value in the model function#
+#
+# Set up the vertical thickness of each cell#
+#------------------#
+#z=rep(180,Nz)                   # thickness of each cell is identical#
+#----#
+#z<-c(10,20,40,80,150,300,300,300,300,300)  # or.. define a vector of unequal thicknesses#
+#----#
+#
+# Extracted from Grid_W files, this is the numeric depth of each "Depth" layer in driving data#
+NEMO<-c(0.000000,   1.023907,    2.103190,    3.251309 ,   4.485053,    5.825238,     7.297443,    8.932686,   10.767898,   12.845992,   15.215269,   17.927923,   21.037571,   24.595987,   28.649651,   33.236965,   38.387100,   44.121010,   50.454468,   57.402565,   64.984604,   73.228699,   82.175560,   91.881409, 102.420174,  113.885239,  126.390930,  140.073975,  155.095047,  171.640244, 189.922791,  210.184464,  232.696976,  257.762878,  285.715790,  316.919861, 351.768005,  390.678619,  434.090546,  482.456329,  536.233215,  595.872070,  661.805237,  734.432129,  814.105652,  901.117981,  995.688538, 1097.954102, 1207.963013, 1325.672485, 1450.950439, 1583.582397, 1723.279785, 1869.693115, 2022.424927, 2181.044434, 2345.101074, 2514.137207, 2687.699463, 2865.346924,3046.659180, 3231.240479, 3418.722900, 3608.769287, 3801.072021, 3995.354248, 4191.367188, 4388.889648, 4587.725586, 4787.702148, 4988.667480, 5190.488281, 5393.049316, 5596.249023, 5800.000000)#
+# thickness of NEMO-MEDUSA layers#
+ z<-c()#
+for(i in 1:(length(NEMO)-1)){#
+ 	z[i]=NEMO[i+1]-NEMO[i]#
+ }	#
+# Trim down z to correspond with bathymetry of driving data.#
+#
+ z<-z[1:length(DrivingData$Layer)]								#
+# Centre of box#
+cz<-c()#
+#
+for(i in 1:length(z)){#
+	cz[i]<-(NEMO[i]+NEMO[i+1])/2#
+}#
+#
+DrivingData#
+zmax<-(sum(z))#
+#
+# Comment/uncomment these lines to generate scenarios of sinking rate#
+#------------------#
+sS<-3#
+sB<-0.001#
+#----#
+#s<-seq(sS,sB,by=((sB-sS)/(Nz-1)))  # sets up a vertical gradient in sinking rate#
+#----#
+s<-rep(sS, length(z))                      # or.. constant vertical sinking rate#
+# Comment/uncomment these lines to generate scenarios of particle replication rate#
+#------------------#
+#rS<-0.0  # particle replication rate in the surface cell = 0#
+rS<-0.02  # particle replication rate in the surface cell = 0.02#
+rB<-0.0  # particle replication rate in the deepest cell = 0#
+#rB<-0.02  # particle replication rate in the deepest cell = 0.02#
+#----#
+#r<-seq(rS,rB,by=((rB-rS)/(length(z)-1)))    # sets up a vertical gradient in replication rate#
+#----#
+#r<-rep(rS,length(z))                        # constant replication rate at all depths#
+#----#
+r<-c(rS,rep(0,length(z)-1))                  # or ... replication only at the surface#
+#----#
+#r<-c(rep(0,length(z)-1),rS)                 # or ... replication only at the bottom#
+#------------------#
+# k=rep(500,length(z))                    # Constant vertical diffusivity with depth adaptable to the driving data#
+#
+ k=DrivingData$Vertical_diffusivity # Example of vector of vertical diffusivity extracted from dataset#
+#------------------#
+# Comment/uncomment these lines to generate scenarios of particle mortality rate#
+#------------------#
+mS<-0.0005#
+#----#
+m<-c(mS,rep(0,length(z)-1))                  # mortality only at the surface#
+#----#
+#m<-c(rep(0,length(z)-1),mS)                 # mortality only at the bottom#
+# Set up the initial conditions#
+#------------------#
+xstart<-rep(0,length(z)+1)  # set up a vector of zeros as the basis for the initial conditions#
+xstart[1]<-100000  # Start with particles only in the surface cell#
+#xstart[length(z)]<-100   # or ... start with particles only in the deepest cell#
+# element length(z)+1 is for the cumulative export flux#
+#
+#------------------#
+#------------------#
+#------------------#
+#------------------#
+parms<-c(z=z[1:length(z)], k=k[1:length(k)], s=s[1:length(s)], r=r[1:length(r)], m=m[1:length(m)])#
+out<-as.data.frame(lsoda(xstart,times,model,parms))
+ttt<-100#
+plot(as.numeric(out[ttt,2:(length(z)+2)]),seq(1,(length(z)+1)*10,by=10),type="l")
+length(DrivingData$Layer)
+plot(as.numeric(out[ttt,2:(length(z)+2)]),seq(1,(length(z)+1)*10,by=10),type="l")
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))), xlim=c(0, 200),type="l",#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+plot(out[,(length(z)+1)],type="l", ylab="No. of Particles", xlab="Time") # seabed abundance1
+temp<-rep(NA,5001)#
+temp[1:5000]<-out[2:5001,length(z)+2]#
+out[,(length(z)+3)]<-temp-out[,(length(z)+2)]#
+plot(out[,(length(z)+3)],type="l", ylab="Flux of particles", xlab="Time", main="Particle Flux from base of water column") # seabed flux
+out[,length(z)+4]<-rowSums(out[,2:(length(z)+1)]) # total depth integrated population in the water column#
+plot(out[,length(z)+4],type="l", ylab="No. of Particles", xlab="Time", main="Particles in water column") # depth integrated population
+plot(out[,length(z)+4],type="l", ylab="No. of Particles", xlab="Time", main="Particles in water column") # depth integrated population
+r<-rep(rS,length(z))                        # constant replication rate at all depths
+parms<-c(z=z[1:length(z)], k=k[1:length(k)], s=s[1:length(s)], r=r[1:length(r)], m=m[1:length(m)])
+out<-as.data.frame(lsoda(xstart,times,model,parms))
+ttt<-100#
+plot(as.numeric(out[ttt,2:(length(z)+2)]),seq(1,(length(z)+1)*10,by=10),type="l")
+ymax<-0#
+for(zzz in 1:length(z)){#
+  ymax<-max(ymax,out[,zzz+1]/z[zzz])#
+}#
+ymax<-1.1*ymax#
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))), xlim=c(0, 200),type="l",#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l",#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+r
+plot(out[,(length(z)+1)],type="l", ylab="No. of Particles", xlab="Time") # seabed abundance1
+temp<-rep(NA,5001)#
+temp[1:5000]<-out[2:5001,length(z)+2]#
+out[,(length(z)+3)]<-temp-out[,(length(z)+2)]#
+plot(out[,(length(z)+3)],type="l", ylab="Flux of particles", xlab="Time", main="Particle Flux from base of water column") # seabed flux
+out[,length(z)+4]<-rowSums(out[,2:(length(z)+1)]) # total depth integrated population in the water column#
+plot(out[,length(z)+4],type="l", ylab="No. of Particles", xlab="Time", main="Particles in water column") # depth integrated population
+model<-function(t,xx,parms){#
+izmax<-length(xx)-1   # izmax = number of wet cells; xx[1]=time,xx[2:izmax+1]=particle numbers in each depth cell#
+fz<-rep(0,izmax) # diffusion flux of particles between cells#
+gz<-rep(0,izmax) # gravitational sinking flux of particles between cells#
+rz<-rep(0,izmax) # replication flux of particles within cells#
+with(as.list(parms),{#
+z<-c(z1,z2,z3,z4,z5,z6,z7,z8,z9,z10) # thickness of each depth layer#
+k<-c(k1,k2,k3,k4,k5,k6,k7,k8,k9,k10) # vertical diffusivity at the base of each cell (m2/unit time)#
+s<-c(s1,s2,s3,s4,s5,s6,s7,s8,s9,s10) # sinking rate within each cell         (m/unit time)#
+r<-c(r1,r2,r3,r4,r5,r6,r7,r8,r9,r10) # reproduction rate within each cell    (/unit time)#
+m<-c(m1,m2,m3,m4,m5,m6,m7,m8,m9,m10) # density dependent mortality rate within each cell (/unit time)#
+#Assumes that kvert applies at the base of each layer  we expect kvert=0 at the sea surface#
+kd<-rep(0,izmax)#
+for(kkk in 2:(izmax)){#
+kd[kkk] <- k[kkk-1]/(z[kkk-1]+z[kkk])#
+}                  # vertical diffusivity gradient (m/unit time)#
+sd<-s/z                              # gravitational loss rate       (/unit time) #
+md<-m/(z^2)                          # density dependent loss rate#
+for(kkk in 2:(izmax-1)){#
+fz[kkk]<-kd[kkk]*((xx[kkk]/z[kkk])-(xx[kkk-1]/z[kkk-1]))  # vertical diffusion flux = diffusivity gradient * concentration difference#
+gz[kkk]<-sd[kkk]*xx[kkk]              # sinking flux = gravtiational loss rate * abundance#
+rz[kkk]<-r[kkk]*xx[kkk]               # growth = growth rate * abundance#
+}#
+fz[1]<-0                              # Flux at the surface = 0 #
+gz[1]<-(sd[1]*xx[1])                   # sinkingfrom the surface cell#
+rz[1]<-(r[1]*xx[1])                   # growth in the surface cell#
+fz[izmax]<-kd[izmax]*((xx[izmax]/z[izmax])-(xx[izmax-1]/z[izmax-1]))    # diffusion flux out of the bottom cell#
+#-------------#
+#Simplest option - a closed system (no export at the base) with no reproduction in the deepest layer#
+#gz[izmax]<-0                      #no sinking export from the deepest layer#
+#rz[izmax]<-0                      #no growth in the deepest layer#
+#-------------#
+#Option with an open system (export at the base) #
+gz[izmax]<-(sd[izmax]*xx[izmax])   # export sinking out of the base of the model#
+rz[izmax]<-(r[izmax]*xx[izmax])    # growth flux in the deepest cell#
+#-------------#
+dxx1 <- (-fz[1]) + fz[2] - gz[1] + rz[1] - md[1]*(xx[1]^2)   # rate of chnage in abundance in surface cell#
+kz<-2#
+dxx2<-  (-fz[kz]) + fz[kz+1] - gz[kz] + gz[kz-1] + rz[kz] - md[kz]*(xx[kz]^2)#
+kz<-3#
+dxx3<-  (-fz[kz]) + fz[kz+1] - gz[kz] + gz[kz-1] + rz[kz] - md[kz]*(xx[kz]^2)#
+kz<-4#
+dxx4<-  (-fz[kz]) + fz[kz+1] - gz[kz] + gz[kz-1] + rz[kz] - md[kz]*(xx[kz]^2)#
+kz<-5#
+dxx5<-  (-fz[kz]) + fz[kz+1] - gz[kz] + gz[kz-1] + rz[kz] - md[kz]*(xx[kz]^2)#
+kz<-6#
+dxx6<-  (-fz[kz]) + fz[kz+1] - gz[kz] + gz[kz-1] + rz[kz] - md[kz]*(xx[kz]^2)#
+kz<-7#
+dxx7<-  (-fz[kz]) + fz[kz+1] - gz[kz] + gz[kz-1] + rz[kz] - md[kz]*(xx[kz]^2)#
+kz<-8#
+dxx8<-  (-fz[kz]) + fz[kz+1] - gz[kz] + gz[kz-1] + rz[kz] - md[kz]*(xx[kz]^2)#
+kz<-9#
+dxx9<-  (-fz[kz]) + fz[kz+1] - gz[kz] + gz[kz-1] + rz[kz] - md[kz]*(xx[kz]^2)#
+kz<-10#
+#dxx10<-0  # closed with no growth#
+dxx10 <- (-fz[kz]) - gz[kz] + gz[kz-1] + rz[kz] - md[kz]*(xx[kz]^2) #open with growth#
+kz<-11#
+#dxx11 <- 0  # exit flux - closed#
+dxx11 <-  gz[kz-1]  #exit flux - open with growth#
+list(c(dxx1,dxx2,dxx3,dxx4,dxx5,dxx6,dxx7,dxx8,dxx9,dxx10,dxx11))#
+})#
+}#
+# ----------  End of model function --------------#
+times<-seq(0,5000,1)#
+Nz<-10  # number of depth layers - in this code must = the hardwired value in the model function#
+# Set up the vertical thickness of each cell#
+#------------------#
+z=rep(180,Nz)                    # thickness of each cell is identical#
+#----#
+#z<-c(10,20,40,80,150,300,300,300,300,300)  # or.. define a vector of unequal thicknesses#
+#----#
+cz<-(-z[1]/2)#
+for(q in (2:Nz)){#
+cz<-c(cz,cz[q-1]-+(z[q-1]/2)-(z[q]/2))#
+}#
+zmax<-(-sum(z))#
+# Comment/uncomment these lines to generate scenarios of sinking rate#
+#------------------#
+sS<-3#
+sB<-0.001#
+#----#
+#s<-seq(sS,sB,by=((sB-sS)/(Nz-1)))  # sets up a vertical gradient in sinking rate#
+#----#
+   s<-rep(sS, Nz)                      # or.. constant vertical sinking rate#
+# Comment/uncomment these lines to generate scenarios of particle replication rate#
+#------------------#
+rS<-0.0  # particle replication rate in the surface cell = 0#
+#rS<-0.02  # particle replication rate in the surface cell = 0.02#
+rB<-0.0  # particle replication rate in the deepest cell = 0#
+#rB<-0.02  # particle replication rate in the deepest cell = 0.02#
+#----#
+#r<-seq(rS,rB,by=((rB-rS)/(Nz-1)))    # sets up a vertical gradient in replication rate#
+#----#
+r<-rep(rS,Nz)                        # constant replication rate at all depths#
+#----#
+ #    r<-c(rS,rep(0,Nz-1))                  # or ... replication only at the surface#
+#----#
+#r<-c(rep(0,Nz-1),rS)                 # or ... replication only at the bottom#
+#------------------#
+k=rep(500,Nz)                         # Constant vertical diffusivity with depth#
+#------------------#
+# Comment/uncomment these lines to generate scenarios of particle mortality rate#
+#------------------#
+mS<-0.0005#
+#----#
+   m<-c(mS,rep(0,Nz-1))                  # mortality only at the surface#
+#----#
+#m<-c(rep(0,Nz-1),mS)                 # mortality only at the bottom#
+# Set up the initial conditions#
+#------------------#
+xstart<-rep(0,11)  # set up a vector of zeros as the basis for the initial conditions#
+xstart[1]<-100000  # Sart with particles only in the surface cell#
+#xstart[10]<-100   # or ... streat with particles only in teh deepest cell#
+                   # element 11 is for the cumulative export flux#
+#------------------#
+#------------------#
+#------------------#
+#------------------#
+parms<-c(z1=z[1],z2=z[2],z3=z[3],z4=z[4],z5=z[5],z6=z[6],z7=z[7],z8=z[8],z9=z[9],z10=z[10],#
+         k1=k[1],k2=k[2],k3=k[3],k4=k[4],k5=k[5],k6=k[6],k7=k[7],k8=k[8],k9=k[9],k10=k[10],#
+         s1=s[1],s2=s[2],s3=s[3],s4=s[4],s5=s[5],s6=s[6],s7=s[7],s8=s[8],s9=s[9],s10=s[10],#
+         r1=r[1],r2=r[2],r3=r[3],r4=r[4],r5=r[5],r6=r[6],r7=r[7],r8=r[8],r9=r[9],r10=r[10],#
+         m1=m[1],m2=m[2],m3=m[3],m4=m[4],m5=m[5],m6=m[6],m7=m[7],m8=m[8],m9=m[9],m10=m[10]#
+        )#
+out<-as.data.frame(lsoda(xstart,times,model,parms))
+plot(as.numeric(out[ttt,2:12]),seq(-1,-110,by=-10),xlim=c(0,100),ylim=c(-100,0),type="l")
+ymax<-0#
+for(zzz in 1:Nz){#
+ymax<-max(ymax,out[,zzz+1]/z[zzz])#
+}#
+ymax<-1.1*ymax#
+for(ttt in 1:5000){#
+#plot(as.numeric(out[ttt,2:12]),seq(-1,-110,by=-10),xlim=c(0,100),ylim=c(-100,0),type="l")#
+plot(as.numeric(out[ttt,2:11]/z),cz,xlim=c(0,200),ylim=c(zmax,0),type="l")#
+}
+plot(out[,12],type="l") # seabed abundance
+temp<-rep(NA,5001)#
+temp[1:5000]<-out[2:5001,12]#
+out[,13]<-temp-out[,12]#
+plot(out[,13],type="l") # seabed flux
+out[,14]<-rowSums(out[,2:11]) # total depth integrated population in the water column#
+plot(out[,14],type="l") # depth integrated population
+m
+model<-function(t,xx,parms){#
+  izmax<-length(xx)-1   # izmax = number of wet cells; xx[1]=time,xx[2:izmax+1]=particle numbers in each depth cell#
+  fz<-rep(0, izmax) # diffusion flux of particles between cells#
+  gz<-rep(0, izmax) # gravitational sinking flux of particles between cells#
+  rz<-rep(0, izmax) # replication flux of particles within cells#
+#
+   dxx<-list(c())#
+  with(as.list(parms),{#
+ #Assumes that kvert applies at the base of each layer  we expect kvert=0 at the sea surface#
+ 	kd<-rep(0, izmax) #
+    for(i in 2:(izmax)){#
+      kd[i] <- k[i-1]/(z[i-1]+z[i]) # vertical diffusivity gradient (m/unit time)#
+    }    #
+    md<-m/(z^2) # density dependent loss rate (/unit time)#
+      sd<-s/z     # gravitational loss rate  #
+    for(i in 2:(izmax-1)){#
+      fz[i]<-kd[i]*((xx[i]/z[i])-(xx[i-1]/z[i-1]))  # vertical diffusion flux = diffusivity gradient * concentration difference#
+      gz[i]<-sd[i]*xx[i]              # sinking flux = gravtiational loss rate * abundance#
+      rz[i]<-r[i]*xx[i]               # growth = growth rate * abundance#
+    }#
+    fz[1]<-0                              # Flux at the surface = 0 #
+    gz[1]<-(sd[1]*xx[1])                   # sinkingfrom the surface cell#
+    rz[1]<-(r[1]*xx[1])                   # growth in the surface cell#
+    fz[izmax]<-kd[izmax]*((xx[izmax]/z[izmax])-(xx[izmax-1]/z[izmax-1]))    # diffusion flux out of the bottom cell#
+    #-------------#
+    #Simplest option - a closed system (no export at the base) with no reproduction in the deepest layer#
+    # gz[izmax]<-0                      #no sinking export from the deepest layer#
+    # rz[izmax]<-0                      #no growth in the deepest layer#
+    #-------------#
+    #Option with an open system (export at the base) #
+    gz[izmax]<-(sd[izmax]*xx[izmax])   # export sinking out of the base of the model#
+    rz[izmax]<-(r[izmax]*xx[izmax])    # growth flux in the deepest cell#
+    #-------------#
+     # rate of change in abundance in surface cell#
+    dxx[[1]][1]<-assign("dxx1", (-fz[1]) + fz[2] - gz[1] + rz[1] - md[1]*(xx[1]^2))	#
+        # Assign function allows automation of setting up sequential variables.#
+    for(i in 2:(length(z)-1)){#
+    dxx[[1]][i]<-assign(paste0("dxx",i), (-fz[i] + fz[i+1] - gz[i] + gz[i-1] + rz[i] - md[i] * (xx[i])^2))#
+    }#
+     # dxx[[1]][length(z)]<-0 # closed no growth#
+   dxx[[1]][length(z)]<-assign(paste0("dxx", length(z)), (-fz[length(z)] - gz[length(z)] + gz[length(z)-1] + rz[length(z)] - md[length(z)] * xx[length(z)]^2))#
+   #  dxx[[1]][length(z)+1]<-0 # exit flux - closed#
+     dxx[[1]][length(z)+1]<-assign(paste0("dxx", length(z)+1), gz[length(z)])#
+    dxx#
+  })#
+}#
+# ----------  End of model function --------------#
+#
+# Driving data containing profile of Depths and Vertical Diffusivity#
+DrivingData<-read.csv("/Users/michael/Desktop/PhD/Research/Water Column Model/DUMMY/data.csv") # or other path...#
+DrivingData<-DrivingData[rowSums(DrivingData[,c(2,3)])!=0,] # removes rows of zeroes (these rows represent below the seabed)#
+times<-seq(0,5000,1)#
+Nz<-10 # fixed number of depth layers - in this code must = the hardwired value in the model function#
+#
+# Set up the vertical thickness of each cell#
+#------------------#
+#z=rep(180,max(DrivingData$Layer))                   # thickness of each cell is identical#
+#----#
+#z<-c(10,20,40,80,150,300,300,300,300,300)  # or.. define a vector of unequal thicknesses#
+#----#
+#
+# Extracted from Grid_W files, this is the numeric depth of each "Depth" layer in driving data#
+NEMO<-c(0.000000,   1.023907,    2.103190,    3.251309 ,   4.485053,    5.825238,     7.297443,    8.932686,   10.767898,   12.845992,   15.215269,   17.927923,   21.037571,   24.595987,   28.649651,   33.236965,   38.387100,   44.121010,   50.454468,   57.402565,   64.984604,   73.228699,   82.175560,   91.881409, 102.420174,  113.885239,  126.390930,  140.073975,  155.095047,  171.640244, 189.922791,  210.184464,  232.696976,  257.762878,  285.715790,  316.919861, 351.768005,  390.678619,  434.090546,  482.456329,  536.233215,  595.872070,  661.805237,  734.432129,  814.105652,  901.117981,  995.688538, 1097.954102, 1207.963013, 1325.672485, 1450.950439, 1583.582397, 1723.279785, 1869.693115, 2022.424927, 2181.044434, 2345.101074, 2514.137207, 2687.699463, 2865.346924,3046.659180, 3231.240479, 3418.722900, 3608.769287, 3801.072021, 3995.354248, 4191.367188, 4388.889648, 4587.725586, 4787.702148, 4988.667480, 5190.488281, 5393.049316, 5596.249023, 5800.000000)#
+# thickness of NEMO-MEDUSA layers#
+ z<-c()#
+for(i in 1:(length(NEMO)-1)){#
+ 	z[i]=NEMO[i+1]-NEMO[i]#
+ }	#
+# Trim down z to correspond with bathymetry of driving data.#
+#
+ z<-z[1:length(DrivingData$Layer)]								#
+# Centre of box#
+cz<-c()#
+#
+for(i in 1:length(z)){#
+	cz[i]<-(NEMO[i]+NEMO[i+1])/2#
+}#
+#
+DrivingData#
+zmax<-(sum(z))#
+#
+# Comment/uncomment these lines to generate scenarios of sinking rate#
+#------------------#
+sS<-3#
+sB<-0.001#
+#----#
+#s<-seq(sS,sB,by=((sB-sS)/(length(z)-1)))  # sets up a vertical gradient in sinking rate#
+#----#
+s<-rep(sS, length(z))                      # or.. constant vertical sinking rate#
+# Comment/uncomment these lines to generate scenarios of particle replication rate#
+#------------------#
+rS<-0.0  # particle replication rate in the surface cell = 0#
+#rS<-0.02  # particle replication rate in the surface cell = 0.02#
+rB<-0.0  # particle replication rate in the deepest cell = 0#
+#rB<-0.02  # particle replication rate in the deepest cell = 0.02#
+#----#
+#r<-seq(rS,rB,by=((rB-rS)/(length(z)-1)))    # sets up a vertical gradient in replication rate#
+#----#
+r<-rep(rS,length(z))                        # constant replication rate at all depths#
+#----#
+#r<-c(rS,rep(0,length(z)-1))                  # or ... replication only at the surface#
+#----#
+#r<-c(rep(0,length(z)-1),rS)                 # or ... replication only at the bottom#
+#------------------#
+# k=rep(500,length(z))                    # Constant vertical diffusivity with depth adaptable to the driving data#
+#
+ k=DrivingData$Vertical_diffusivity # Example of vector of vertical diffusivity extracted from dataset#
+#------------------#
+# Comment/uncomment these lines to generate scenarios of particle mortality rate#
+#------------------#
+mS<-0.0005#
+#----#
+m<-c(mS,rep(0,length(z)-1))                  # mortality only at the surface#
+#----#
+#m<-c(rep(0,length(z)-1),mS)                 # mortality only at the bottom#
+# Set up the initial conditions#
+#------------------#
+xstart<-rep(0,length(z)+1)  # set up a vector of zeros as the basis for the initial conditions#
+xstart[1]<-100000  # Start with particles only in the surface cell#
+#xstart[length(z)]<-100   # or ... start with particles only in the deepest cell#
+# element length(z)+1 is for the cumulative export flux#
+#
+#------------------#
+#------------------#
+#------------------#
+#------------------#
+parms<-c(z=z[1:length(z)], k=k[1:length(k)], s=s[1:length(s)], r=r[1:length(r)], m=m[1:length(m)])#
+out<-as.data.frame(lsoda(xstart,times,model,parms))
+ttt<-100#
+plot(as.numeric(out[ttt,2:(length(z)+2)]),seq(1,(length(z)+1)*10,by=10),type="l")
+ymax<-0#
+for(zzz in 1:length(z)){#
+  ymax<-max(ymax,out[,zzz+1]/z[zzz])#
+}#
+ymax<-1.1*ymax#
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l",#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,max(z)/z),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+z
+max(z)/z
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+ymax<-1.1*ymax#
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,max(cz)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+ymax<-1.1*ymax#
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,max(cz)/max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+ymax<-1.1*ymax#
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,1.1*max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+out[,length(z)+4]<-rowSums(out[,2:(length(z)+1)]) # total depth integrated population in the water column#
+plot(out[,length(z)+4],type="l", ylab="No. of Particles", xlab="Time", main="Particles in water column") # depth integrated population
+plot(out[,(length(z)+1)],type="l", ylab="No. of Particles", xlab="Time") # seabed abundance1
+temp<-rep(NA,5001)#
+temp[1:5000]<-out[2:5001,length(z)+2]#
+out[,(length(z)+3)]<-temp-out[,(length(z)+2)]#
+plot(out[,(length(z)+3)],type="l", ylab="Flux of particles", xlab="Time", main="Particle Flux from base of water column") # seabed flux
+out[,length(z)+4]<-rowSums(out[,2:(length(z)+1)]) # total depth integrated population in the water column#
+plot(out[,length(z)+4],type="l", ylab="No. of Particles", xlab="Time", main="Particles in water column") # depth integrated population
+tail(out)
+plot(out[,(length(z)+3)],type="l", ylab="Flux of particles", xlab="Time", main="Particle Flux from base of water column") # seabed flux
+head(out)
+head(round(out, digits=2))
+head(out)
+model<-function(t,xx,parms){#
+  izmax<-length(xx)-1   # izmax = number of wet cells; xx[1]=time,xx[2:izmax+1]=particle numbers in each depth cell#
+  fz<-rep(0, izmax) # diffusion flux of particles between cells#
+  gz<-rep(0, izmax) # gravitational sinking flux of particles between cells#
+  rz<-rep(0, izmax) # replication flux of particles within cells#
+#
+   dxx<-list(c())#
+  with(as.list(parms),{#
+ #Assumes that kvert applies at the base of each layer  we expect kvert=0 at the sea surface#
+ 	kd<-rep(0, izmax) #
+    for(i in 2:(izmax)){#
+      kd[i] <- k[i-1]/(z[i-1]+z[i]) # vertical diffusivity gradient (m/unit time)#
+    }    #
+    md<-m/(z^2) # density dependent loss rate (/unit time)#
+      sd<-s/z     # gravitational loss rate  #
+    for(i in 2:(izmax-1)){#
+      fz[i]<-kd[i]*((xx[i]/z[i])-(xx[i-1]/z[i-1]))  # vertical diffusion flux = diffusivity gradient * concentration difference#
+      gz[i]<-sd[i]*xx[i]              # sinking flux = gravtiational loss rate * abundance#
+      rz[i]<-r[i]*xx[i]               # growth = growth rate * abundance#
+    }#
+    fz[1]<-0                              # Flux at the surface = 0 #
+    gz[1]<-(sd[1]*xx[1])                   # sinkingfrom the surface cell#
+    rz[1]<-(r[1]*xx[1])                   # growth in the surface cell#
+    fz[izmax]<-kd[izmax]*((xx[izmax]/z[izmax])-(xx[izmax-1]/z[izmax-1]))    # diffusion flux out of the bottom cell#
+    #-------------#
+    #Simplest option - a closed system (no export at the base) with no reproduction in the deepest layer#
+    # gz[izmax]<-0                      #no sinking export from the deepest layer#
+    # rz[izmax]<-0                      #no growth in the deepest layer#
+    #-------------#
+    #Option with an open system (export at the base) #
+    gz[izmax]<-(sd[izmax]*xx[izmax])   # export sinking out of the base of the model#
+    rz[izmax]<-(r[izmax]*xx[izmax])    # growth flux in the deepest cell#
+    #-------------#
+     # rate of change in abundance in surface cell#
+    dxx[[1]][1]<-assign("dxx1", (-fz[1]) + fz[2] - gz[1] + rz[1] - md[1]*(xx[1]^2))	#
+        # Assign function allows automation of setting up sequential variables.#
+    for(i in 2:(length(z)-1)){#
+    dxx[[1]][i]<-assign(paste0("dxx",i), (-fz[i] + fz[i+1] - gz[i] + gz[i-1] + rz[i] - md[i] * (xx[i])^2))#
+    }#
+     # dxx[[1]][length(z)]<-0 # closed no growth#
+   dxx[[1]][length(z)]<-assign(paste0("dxx", length(z)), (-fz[length(z)] - gz[length(z)] + gz[length(z)-1] + rz[length(z)] - md[length(z)] * xx[length(z)]^2)).      	#open with growth#
+   #  dxx[[1]][length(z)+1]<-0 # exit flux - closed#
+     dxx[[1]][length(z)+1]<-assign(paste0("dxx", length(z)+1), gz[length(z)])          #exit flux - open with growth#
+    dxx#
+  })#
+}
+model<-function(t,xx,parms){#
+  izmax<-length(xx)-1   # izmax = number of wet cells; xx[1]=time,xx[2:izmax+1]=particle numbers in each depth cell#
+  fz<-rep(0, izmax) # diffusion flux of particles between cells#
+  gz<-rep(0, izmax) # gravitational sinking flux of particles between cells#
+  rz<-rep(0, izmax) # replication flux of particles within cells#
+#
+   dxx<-list(c())#
+  with(as.list(parms),{#
+ #Assumes that kvert applies at the base of each layer  we expect kvert=0 at the sea surface#
+ 	kd<-rep(0, izmax) #
+    for(i in 2:(izmax)){#
+      kd[i] <- k[i-1]/(z[i-1]+z[i]) # vertical diffusivity gradient (m/unit time)#
+    }    #
+    md<-m/(z^2) # density dependent loss rate (/unit time)#
+      sd<-s/z     # gravitational loss rate  #
+    for(i in 2:(izmax-1)){#
+      fz[i]<-kd[i]*((xx[i]/z[i])-(xx[i-1]/z[i-1]))  # vertical diffusion flux = diffusivity gradient * concentration difference#
+      gz[i]<-sd[i]*xx[i]              # sinking flux = gravtiational loss rate * abundance#
+      rz[i]<-r[i]*xx[i]               # growth = growth rate * abundance#
+    }#
+    fz[1]<-0                              # Flux at the surface = 0 #
+    gz[1]<-(sd[1]*xx[1])                   # sinkingfrom the surface cell#
+    rz[1]<-(r[1]*xx[1])                   # growth in the surface cell#
+    fz[izmax]<-kd[izmax]*((xx[izmax]/z[izmax])-(xx[izmax-1]/z[izmax-1]))    # diffusion flux out of the bottom cell#
+    #-------------#
+    #Simplest option - a closed system (no export at the base) with no reproduction in the deepest layer#
+    # gz[izmax]<-0                      #no sinking export from the deepest layer#
+    # rz[izmax]<-0                      #no growth in the deepest layer#
+    #-------------#
+    #Option with an open system (export at the base) #
+    gz[izmax]<-(sd[izmax]*xx[izmax])   # export sinking out of the base of the model#
+    rz[izmax]<-(r[izmax]*xx[izmax])    # growth flux in the deepest cell#
+    #-------------#
+     # rate of change in abundance in surface cell#
+    dxx[[1]][1]<-assign("dxx1", (-fz[1]) + fz[2] - gz[1] + rz[1] - md[1]*(xx[1]^2))	#
+        # Assign function allows automation of setting up sequential variables.#
+    for(i in 2:(length(z)-1)){#
+    dxx[[1]][i]<-assign(paste0("dxx",i), (-fz[i] + fz[i+1] - gz[i] + gz[i-1] + rz[i] - md[i] * (xx[i])^2))#
+    }#
+     # dxx[[1]][length(z)]<-0 # closed no growth#
+   dxx[[1]][length(z)]<-assign(paste0("dxx", length(z)), (-fz[length(z)] - gz[length(z)] + gz[length(z)-1] + rz[length(z)] - md[length(z)] * xx[length(z)]^2))      	#open with growth#
+   #  dxx[[1]][length(z)+1]<-0 # exit flux - closed#
+     dxx[[1]][length(z)+1]<-assign(paste0("dxx", length(z)+1), gz[length(z)])          #exit flux - open with growth#
+    dxx#
+  })#
+}
+z=rep(180,10)                   # thickness of each cell is identical
+cz<-(-z[1]/2)#
+for(q in (2:Nz)){#
+cz<-c(cz,cz[q-1]-+(z[q-1]/2)-(z[q]/2))#
+}
+zmax<-(sum(z))
+z
+s<-rep(sS, 10)                      # or.. constant vertical sinking rate
+s
+r<-rep(rS,10)                        # constant replication rate at all depths
+r
+k=rep(500,10)                    # Constant vertical diffusivity with depth adaptable to the driving data
+mS<-0.0005
+m<-c(mS,rep(0,10-1))                  # mortality only at the surface
+xstart<-rep(0,11)  # set up a vector of zeros as the basis for the initial conditions
+xstart[1]<-100000  # Start with particles only in the surface cell
+z
+k
+s
+r
+m
+parms<-c(z=z[1:length(z)], k=k[1:length(k)], s=s[1:length(s)], r=r[1:length(r)], m=m[1:length(m)])
+out<-as.data.frame(lsoda(xstart,times,model,parms))
+ttt<-100
+plot(as.numeric(out[ttt,2:(length(z)+2)]),seq(1,(length(z)+1)*10,by=10),type="l")
+ttt<-200
+plot(as.numeric(out[ttt,2:(length(z)+2)]),seq(1,(length(z)+1)*10,by=10),type="l")
+ttt<-2000
+plot(as.numeric(out[ttt,2:(length(z)+2)]),seq(1,(length(z)+1)*10,by=10),type="l")
+ymax<-0#
+for(zzz in 1:length(z)){#
+  ymax<-max(ymax,out[,zzz+1]/z[zzz])#
+}#
+ymax<-1.1*ymax#
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,1.1*max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+ymax<-0#
+for(zzz in 1:Nz){#
+ymax<-max(ymax,out[,zzz+1]/z[zzz])#
+}#
+ymax<-1.1*ymax#
+for(ttt in 1:5000){#
+#plot(as.numeric(out[ttt,2:12]),seq(-1,-110,by=-10),xlim=c(0,100),ylim=c(-100,0),type="l")#
+plot(as.numeric(out[ttt,2:11]/z),cz,xlim=c(0,200),ylim=c(zmax,0),type="l")#
+}
+plot(out[,(length(z)+1)],type="l", ylab="No. of Particles", xlab="Time") # seabed abundance1
+plot(out[,12],type="l") # seabed abundance
+plot(out[,(length(z)+1)],type="l", ylab="No. of Particles", xlab="Time") # seabed abundance1
+plot(out[,(length(z)+2)],type="l", ylab="No. of Particles", xlab="Time") # seabed abundance1
+temp<-rep(NA,5001)#
+temp[1:5000]<-out[2:5001,length(z)+2]#
+out[,(length(z)+3)]<-temp-out[,(length(z)+2)]#
+plot(out[,(length(z)+3)],type="l", ylab="Flux of particles", xlab="Time", main="Particle Flux from base of water column") # seabed flux
+temp<-rep(NA,5001)#
+temp[1:5000]<-out[2:5001,12]#
+out[,13]<-temp-out[,12]#
+plot(out[,13],type="l") # seabed flux
+out[,length(z)+4]<-rowSums(out[,2:(length(z)+1)]) # total depth integrated population in the water column#
+plot(out[,length(z)+4],type="l", ylab="No. of Particles", xlab="Time", main="Particles in water column") # depth integrated population
+out[,14]<-rowSums(out[,2:11]) # total depth integrated population in the water column#
+plot(out[,14],type="l") # depth integrated population
+model<-function(t,xx,parms){#
+  izmax<-length(xx)-1   # izmax = number of wet cells; xx[1]=time,xx[2:izmax+1]=particle numbers in each depth cell#
+  fz<-rep(0, izmax) # diffusion flux of particles between cells#
+  gz<-rep(0, izmax) # gravitational sinking flux of particles between cells#
+  rz<-rep(0, izmax) # replication flux of particles within cells#
+#
+   dxx<-list(c())#
+  with(as.list(parms),{#
+ #Assumes that kvert applies at the base of each layer  we expect kvert=0 at the sea surface#
+ 	kd<-rep(0, izmax) #
+    for(i in 2:(izmax)){#
+      kd[i] <- k[i-1]/(z[i-1]+z[i]) # vertical diffusivity gradient (m/unit time)#
+    }    #
+    md<-m/(z^2) # density dependent loss rate (/unit time)#
+      sd<-s/z     # gravitational loss rate  #
+    for(i in 2:(izmax-1)){#
+      fz[i]<-kd[i]*((xx[i]/z[i])-(xx[i-1]/z[i-1]))  # vertical diffusion flux = diffusivity gradient * concentration difference#
+      gz[i]<-sd[i]*xx[i]              # sinking flux = gravtiational loss rate * abundance#
+      rz[i]<-r[i]*xx[i]               # growth = growth rate * abundance#
+    }#
+    fz[1]<-0                              # Flux at the surface = 0 #
+    gz[1]<-(sd[1]*xx[1])                   # sinkingfrom the surface cell#
+    rz[1]<-(r[1]*xx[1])                   # growth in the surface cell#
+    fz[izmax]<-kd[izmax]*((xx[izmax]/z[izmax])-(xx[izmax-1]/z[izmax-1]))    # diffusion flux out of the bottom cell#
+    #-------------#
+    #Simplest option - a closed system (no export at the base) with no reproduction in the deepest layer#
+    # gz[izmax]<-0                      #no sinking export from the deepest layer#
+    # rz[izmax]<-0                      #no growth in the deepest layer#
+    #-------------#
+    #Option with an open system (export at the base) #
+    gz[izmax]<-(sd[izmax]*xx[izmax])   # export sinking out of the base of the model#
+    rz[izmax]<-(r[izmax]*xx[izmax])    # growth flux in the deepest cell#
+    #-------------#
+     # rate of change in abundance in surface cell#
+    dxx[[1]][1]<-assign("dxx1", (-fz[1]) + fz[2] - gz[1] + rz[1] - md[1]*(xx[1]^2))	#
+        # Assign function allows automation of setting up sequential variables.#
+    for(i in 2:(length(z)-1)){#
+    dxx[[1]][i]<-assign(paste0("dxx",i), (-fz[i] + fz[i+1] - gz[i] + gz[i-1] + rz[i] - md[i] * (xx[i])^2))#
+    }#
+     # dxx[[1]][length(z)]<-0 # closed no growth#
+   dxx[[1]][length(z)]<-assign(paste0("dxx", length(z)), (-fz[length(z)] - gz[length(z)] + gz[length(z)-1] + rz[length(z)] - md[length(z)] * xx[length(z)]^2))      	#open with growth#
+   #  dxx[[1]][length(z)+1]<-0 # exit flux - closed#
+     dxx[[1]][length(z)+1]<-assign(paste0("dxx", length(z)+1), gz[length(z)])          #exit flux - open with growth#
+    dxx#
+  })#
+}#
+# ----------  End of model function --------------#
+#
+# Driving data containing profile of Depths and Vertical Diffusivity#
+DrivingData<-read.csv("/Users/michael/Desktop/PhD/Research/Water Column Model/DUMMY/data.csv") # or other path...#
+DrivingData<-DrivingData[rowSums(DrivingData[,c(2,3)])!=0,] # removes rows of zeroes (these rows represent below the seabed)#
+times<-seq(0,5000,1)#
+Nz<-10 # fixed number of depth layers - in this code must = the hardwired value in the model function#
+#
+# Set up the vertical thickness of each cell#
+#------------------#
+#z=rep(180,max(DrivingData$Layer))                   # thickness of each cell is identical#
+#----#
+#z<-c(10,20,40,80,150,300,300,300,300,300)  # or.. define a vector of unequal thicknesses#
+#----#
+#
+# Extracted from Grid_W files, this is the numeric depth of each "Depth" layer in driving data#
+NEMO<-c(0.000000,   1.023907,    2.103190,    3.251309 ,   4.485053,    5.825238,     7.297443,    8.932686,   10.767898,   12.845992,   15.215269,   17.927923,   21.037571,   24.595987,   28.649651,   33.236965,   38.387100,   44.121010,   50.454468,   57.402565,   64.984604,   73.228699,   82.175560,   91.881409, 102.420174,  113.885239,  126.390930,  140.073975,  155.095047,  171.640244, 189.922791,  210.184464,  232.696976,  257.762878,  285.715790,  316.919861, 351.768005,  390.678619,  434.090546,  482.456329,  536.233215,  595.872070,  661.805237,  734.432129,  814.105652,  901.117981,  995.688538, 1097.954102, 1207.963013, 1325.672485, 1450.950439, 1583.582397, 1723.279785, 1869.693115, 2022.424927, 2181.044434, 2345.101074, 2514.137207, 2687.699463, 2865.346924,3046.659180, 3231.240479, 3418.722900, 3608.769287, 3801.072021, 3995.354248, 4191.367188, 4388.889648, 4587.725586, 4787.702148, 4988.667480, 5190.488281, 5393.049316, 5596.249023, 5800.000000)#
+# thickness of NEMO-MEDUSA layers#
+ z<-c()#
+for(i in 1:(length(NEMO)-1)){#
+ 	z[i]=NEMO[i+1]-NEMO[i]#
+ }	#
+# Trim down z to correspond with bathymetry of driving data.#
+#
+ z<-z[1:length(DrivingData$Layer)]								#
+cz<-(-z[1]/2)#
+for(q in (2:Nz)){#
+cz<-c(cz,cz[q-1]-+(z[q-1]/2)-(z[q]/2))#
+}#
+# Centre of box#
+cz<-c()#
+#
+for(i in 1:length(z)){#
+	cz[i]<-(NEMO[i]+NEMO[i+1])/2#
+}#
+zmax<-(sum(z))#
+# Comment/uncomment these lines to generate scenarios of sinking rate#
+#------------------#
+sS<-3#
+sB<-0.001#
+#----#
+#s<-seq(sS,sB,by=((sB-sS)/(length(z)-1)))  # sets up a vertical gradient in sinking rate#
+#----#
+s<-rep(sS, length(z))                      # or.. constant vertical sinking rate#
+# Comment/uncomment these lines to generate scenarios of particle replication rate#
+#------------------#
+rS<-0.0  # particle replication rate in the surface cell = 0#
+#rS<-0.02  # particle replication rate in the surface cell = 0.02#
+rB<-0.0  # particle replication rate in the deepest cell = 0#
+#rB<-0.02  # particle replication rate in the deepest cell = 0.02#
+#----#
+#r<-seq(rS,rB,by=((rB-rS)/(length(z)-1)))    # sets up a vertical gradient in replication rate#
+#----#
+r<-rep(rS,length(z))                        # constant replication rate at all depths#
+#----#
+#r<-c(rS,rep(0,length(z)-1))                  # or ... replication only at the surface#
+#----#
+#r<-c(rep(0,length(z)-1),rS)                 # or ... replication only at the bottom#
+#------------------#
+# k=rep(500,length(z))                    # Constant vertical diffusivity with depth adaptable to the driving data#
+#
+ k=DrivingData$Vertical_diffusivity # Example of vector of vertical diffusivity extracted from dataset#
+#------------------#
+# Comment/uncomment these lines to generate scenarios of particle mortality rate#
+#------------------#
+mS<-0.0005#
+#----#
+m<-c(mS,rep(0,length(z)-1))                  # mortality only at the surface#
+#----#
+#m<-c(rep(0,length(z)-1),mS)                 # mortality only at the bottom#
+# Set up the initial conditions#
+#------------------#
+xstart<-rep(0,length(z)+1)  # set up a vector of zeros as the basis for the initial conditions#
+xstart[1]<-100000  # Start with particles only in the surface cell#
+#xstart[length(z)]<-100   # or ... start with particles only in the deepest cell#
+# element length(z)+1 is for the cumulative export flux#
+#
+#------------------#
+#------------------#
+#------------------#
+#------------------#
+parms<-c(z=z[1:length(z)], k=k[1:length(k)], s=s[1:length(s)], r=r[1:length(r)], m=m[1:length(m)])#
+out<-as.data.frame(lsoda(xstart,times,model,parms))
+ttt<-2000#
+plot(as.numeric(out[ttt,2:(length(z)+2)]),seq(1,(length(z)+1)*10,by=10),type="l")
+ttt<-200
+plot(as.numeric(out[ttt,2:(length(z)+2)]),seq(1,(length(z)+1)*10,by=10),type="l")
+ymax<-0#
+for(zzz in 1:length(z)){#
+  ymax<-max(ymax,out[,zzz+1]/z[zzz])#
+}#
+ymax<-1.1*ymax#
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,1.1*max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+plot(out[,(length(z)+2)],type="l", ylab="No. of Particles", xlab="Time") # seabed abundance1
+temp<-rep(NA,5001)#
+temp[1:5000]<-out[2:5001,length(z)+2]#
+out[,(length(z)+3)]<-temp-out[,(length(z)+2)]#
+plot(out[,(length(z)+3)],type="l", ylab="Flux of particles", xlab="Time", main="Particle Flux from base of water column") # seabed flux
+out[,length(z)+4]<-rowSums(out[,2:(length(z)+1)]) # total depth integrated population in the water column#
+plot(out[,length(z)+4],type="l", ylab="No. of Particles", xlab="Time", main="Particles in water column") # depth integrated population
+head(out)
+plot(out[,(length(z)+2)],type="l", ylab="No. of Particles", xlab="Time") # seabed abundance1
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,1.1*max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+ymax<-1.1*ymax#
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,1.3*max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,1.5*max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+plot(out[,length(z)+4],type="l", ylab="No. of Particles", xlab="Time", main="Particles in water column") # depth integrated population
+out[,length(z)+4]<-rowSums(out[,2:(length(z)+1)]) # total depth integrated population in the water column#
+plot(out[,length(z)+4],type="l", ylab="No. of Particles", xlab="Time", main="Particles in water column") # depth integrated population
+tail(out)
+length(z)+2
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,1.7*max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,2*max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+plot(as.numeric(out[ttt,2:(length(z)+2)]),seq(1,(length(z)+1)*10,by=10),type="l")
+plot(as.numeric(out[ttt,2:(length(z)+2)]),seq(1,(length(z)+1)*10,by=10),type="l", xlab="Particles", ylab="Depth", ylim=rev(range(seq(1,(length(z)+1)*10,by=10))))
+ttt<-2000
+plot(as.numeric(out[ttt,2:(length(z)+2)]),seq(1,(length(z)+1)*10,by=10),type="l", xlab="Particles", ylab="Depth", ylim=rev(range(seq(1,(length(z)+1)*10,by=10))))
+ttt<-5000
+plot(as.numeric(out[ttt,2:(length(z)+2)]),seq(1,(length(z)+1)*10,by=10),type="l", xlab="Particles", ylab="Depth", ylim=rev(range(seq(1,(length(z)+1)*10,by=10))))
+plot(as.numeric(out[ttt,2:(length(z)+2)]),cz,type="l", xlab="Particles", ylab="Depth", )
+length(cz)
+length(as.numeric(out[ttt,2:(length(z)+2)]))
+length(z)
+length(NEMO)
+length(DrivingData$Layer)
+length(NEMO[DrivingData$Layer])
+length(NEMO[DrivingData$Layer]+1)
+length(NEMO[DrivingData$Layer+1])
+length(NEMO[DrivingData$Layer])+1
+NEMO[length(NEMO[DrivingData$Layer])+1]
+NEMO[1:length(NEMO[DrivingData$Layer])+1]
+plot(as.numeric(out[ttt,2:(length(z)+2)]),NEMO[1:length(NEMO[DrivingData$Layer])+1],type="l", xlab="Particles", ylab="Depth", )
+plot(as.numeric(out[ttt,2:(length(z)+2)]),NEMO[1:length(NEMO[DrivingData$Layer])],type="l", xlab="Particles", ylab="Depth", )
+length(as.numeric(out[ttt,2:(length(z)+2)]))
+length(NEMO[1:length(NEMO[DrivingData$Layer])+1])
+plot(as.numeric(out[ttt,2:(length(z)+2)]),length(NEMO[1:length(NEMO[DrivingData$Layer])]+1),type="l", xlab="Particles", ylab="Depth", )
+length(NEMO[1:length(NEMO[DrivingData$Layer])]+1)
+plot(as.numeric(out[ttt,2:(length(z)+2)]),length(NEMO[1:length(NEMO[DrivingData$Layer+1])]),type="l", xlab="Particles", ylab="Depth", )
+plot(as.numeric(out[ttt,2:(length(z)+2)]),length(NEMO[1:length(NEMO[DrivingData$Layer]+1)]),type="l", xlab="Particles", ylab="Depth", )
+plot(as.numeric(out[ttt,2:(length(z)+2)]),length(NEMO[1:length(NEMO[DrivingData$Layer])+1]),type="l", xlab="Particles", ylab="Depth", )
+plot(as.numeric(out[ttt,2:(length(z)+2)]),length(NEMO[1:length(NEMO[DrivingData$Layer])]+1),type="l", xlab="Particles", ylab="Depth", )
+length(NEMO[1:length(NEMO[DrivingData$Layer])])
+length(NEMO[1:length(NEMO[DrivingData$Layer])])+1
+NEMO[1:length(NEMO[DrivingData$Layer])]+1
+NEMO[1:length(NEMO[DrivingData$Layer+1])]
+NEMO[1:length(NEMO[DrivingData$Layer]+1)]
+NEMO[1:length(NEMO[DrivingData$Layer])+1]
+plot(as.numeric(out[ttt,2:(length(z)+2)]),NEMO[1:length(NEMO[DrivingData$Layer])+1],type="l", xlab="Particles", ylab="Depth", )
+NEMO[1:length(NEMO[1:(length(DrivingData$Layer)+1)])]
+plot(as.numeric(out[ttt,2:(length(z)+2)]),NEMO[1:length(NEMO[1:(length(DrivingData$Layer)+1)])],type="l", xlab="Particles", ylab="Depth", )
+ttt<-200
+plot(as.numeric(out[ttt,2:(length(z)+2)]),NEMO[1:length(NEMO[1:(length(DrivingData$Layer)+1)])],type="l", xlab="Particles", ylab="Depth", )
+ttt<-2000
+plot(as.numeric(out[ttt,2:(length(z)+2)]),NEMO[1:length(NEMO[1:(length(DrivingData$Layer)+1)])],type="l", xlab="Particles", ylab="Depth", )
+ttt<-100
+plot(as.numeric(out[ttt,2:(length(z)+2)]),NEMO[1:length(NEMO[1:(length(DrivingData$Layer)+1)])],type="l", xlab="Particles", ylab="Depth", )
+ymax<-1.1*ymax
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,2*max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+DrivingData
+head(DrivingData)
+clear()
+model<-function(t,xx,parms){
+izmax<-length(xx)-1   # izmax = number of wet cells; xx[1]=time,xx[2:izmax+1]=particle numbers in each depth cell#
+  fz<-rep(0, izmax) # diffusion flux of particles between cells#
+  gz<-rep(0, izmax) # gravitational sinking flux of particles between cells#
+  rz<-rep(0, izmax) # replication flux of particles within cells#
+#
+   dxx<-list(c())#
+  with(as.list(parms),{#
+ #Assumes that kvert applies at the base of each layer  we expect kvert=0 at the sea surface#
+ 	kd<-rep(0, izmax) #
+    for(i in 2:(izmax)){#
+      kd[i] <- k[i-1]/(z[i-1]+z[i]) # vertical diffusivity gradient (m/unit time)#
+    }    #
+    md<-m/(z^2) # density dependent loss rate (/unit time)#
+      sd<-s/z     # gravitational loss rate  #
+    for(i in 2:(izmax-1)){#
+      fz[i]<-kd[i]*((xx[i]/z[i])-(xx[i-1]/z[i-1]))  # vertical diffusion flux = diffusivity gradient * concentration difference#
+      gz[i]<-sd[i]*xx[i]              # sinking flux = gravtiational loss rate * abundance#
+      rz[i]<-r[i]*xx[i]               # growth = growth rate * abundance#
+    }#
+    fz[1]<-0                              # Flux at the surface = 0 #
+    gz[1]<-(sd[1]*xx[1])                   # sinkingfrom the surface cell#
+    rz[1]<-(r[1]*xx[1])                   # growth in the surface cell#
+    fz[izmax]<-kd[izmax]*((xx[izmax]/z[izmax])-(xx[izmax-1]/z[izmax-1]))    # diffusion flux out of the bottom cell#
+    #-------------#
+    #Simplest option - a closed system (no export at the base) with no reproduction in the deepest layer#
+    # gz[izmax]<-0                      #no sinking export from the deepest layer#
+    # rz[izmax]<-0                      #no growth in the deepest layer#
+    #-------------#
+    #Option with an open system (export at the base) #
+    gz[izmax]<-(sd[izmax]*xx[izmax])   # export sinking out of the base of the model#
+    rz[izmax]<-(r[izmax]*xx[izmax])    # growth flux in the deepest cell#
+    #-------------#
+     # rate of change in abundance in surface cell#
+    dxx[[1]][1]<-assign("dxx1", (-fz[1]) + fz[2] - gz[1] + rz[1] - md[1]*(xx[1]^2))	#
+        # Assign function allows automation of setting up sequential variables.#
+    for(i in 2:(length(z)-1)){#
+    dxx[[1]][i]<-assign(paste0("dxx",i), (-fz[i] + fz[i+1] - gz[i] + gz[i-1] + rz[i] - md[i] * (xx[i])^2))#
+    }#
+     # dxx[[1]][length(z)]<-0 # closed no growth#
+   dxx[[1]][length(z)]<-assign(paste0("dxx", length(z)), (-fz[length(z)] - gz[length(z)] + gz[length(z)-1] + rz[length(z)] - md[length(z)] * xx[length(z)]^2))      	#open with growth#
+   #  dxx[[1]][length(z)+1]<-0 # exit flux - closed#
+     dxx[[1]][length(z)+1]<-assign(paste0("dxx", length(z)+1), gz[length(z)])          #exit flux - open with growth#
+    dxx#
+  })#
+}
+head(out)
+out<-as.data.frame(lsoda(xstart,times,model,parms))
+DrivingData<-read.csv("/Users/michael/Desktop/PhD/Research/Water Column Model/DUMMY/data.csv") # or other path...
+head(DrivingData)
+z<-z[1:length(DrivingData$Layer)]
+z
+k
+parms<-c(z=z[1:length(z)], k=k[1:length(k)], s=s[1:length(s)], r=r[1:length(r)], m=m[1:length(m)])
+parms
+z<-z[1:length(DrivingData$Layer)]
+z
+ttt<-100
+head(out)
+ttt<-100
+plot(as.numeric(out[ttt,2:(length(z)+2)]),NEMO[1:length(NEMO[1:(length(DrivingData$Layer)+1)])],type="l", xlab="Particles", ylab="Depth", )
+model<-function(t,xx,parms){#
+  izmax<-length(xx)-1   # izmax = number of wet cells; xx[1]=time,xx[2:izmax+1]=particle numbers in each depth cell#
+  fz<-rep(0, izmax) # diffusion flux of particles between cells#
+  gz<-rep(0, izmax) # gravitational sinking flux of particles between cells#
+  rz<-rep(0, izmax) # replication flux of particles within cells#
+#
+   dxx<-list(c())#
+  with(as.list(parms),{#
+ #Assumes that kvert applies at the base of each layer  we expect kvert=0 at the sea surface#
+ 	kd<-rep(0, izmax) #
+    for(i in 2:(izmax)){#
+      kd[i] <- k[i-1]/(z[i-1]+z[i]) # vertical diffusivity gradient (m/unit time)#
+    }    #
+    md<-m/(z^2) # density dependent loss rate (/unit time)#
+      sd<-s/z     # gravitational loss rate  #
+    for(i in 2:(izmax-1)){#
+      fz[i]<-kd[i]*((xx[i]/z[i])-(xx[i-1]/z[i-1]))  # vertical diffusion flux = diffusivity gradient * concentration difference#
+      gz[i]<-sd[i]*xx[i]              # sinking flux = gravtiational loss rate * abundance#
+      rz[i]<-r[i]*xx[i]               # growth = growth rate * abundance#
+    }#
+    fz[1]<-0                              # Flux at the surface = 0 #
+    gz[1]<-(sd[1]*xx[1])                   # sinkingfrom the surface cell#
+    rz[1]<-(r[1]*xx[1])                   # growth in the surface cell#
+    fz[izmax]<-kd[izmax]*((xx[izmax]/z[izmax])-(xx[izmax-1]/z[izmax-1]))    # diffusion flux out of the bottom cell#
+    #-------------#
+    #Simplest option - a closed system (no export at the base) with no reproduction in the deepest layer#
+    # gz[izmax]<-0                      #no sinking export from the deepest layer#
+    # rz[izmax]<-0                      #no growth in the deepest layer#
+    #-------------#
+    #Option with an open system (export at the base) #
+    gz[izmax]<-(sd[izmax]*xx[izmax])   # export sinking out of the base of the model#
+    rz[izmax]<-(r[izmax]*xx[izmax])    # growth flux in the deepest cell#
+    #-------------#
+     # rate of change in abundance in surface cell#
+    dxx[[1]][1]<-assign("dxx1", (-fz[1]) + fz[2] - gz[1] + rz[1] - md[1]*(xx[1]^2))	#
+        # Assign function allows automation of setting up sequential variables.#
+    for(i in 2:(length(z)-1)){#
+    dxx[[1]][i]<-assign(paste0("dxx",i), (-fz[i] + fz[i+1] - gz[i] + gz[i-1] + rz[i] - md[i] * (xx[i])^2))#
+    }#
+     # dxx[[1]][length(z)]<-0 # closed no growth#
+   dxx[[1]][length(z)]<-assign(paste0("dxx", length(z)), (-fz[length(z)] - gz[length(z)] + gz[length(z)-1] + rz[length(z)] - md[length(z)] * xx[length(z)]^2))      	#open with growth#
+   #  dxx[[1]][length(z)+1]<-0 # exit flux - closed#
+     dxx[[1]][length(z)+1]<-assign(paste0("dxx", length(z)+1), gz[length(z)])          #exit flux - open with growth#
+    dxx#
+  })#
+}#
+# ----------  End of model function --------------#
+#
+# Driving data containing profile of Depths and Vertical Diffusivity#
+DrivingData<-read.csv("/Users/michael/Desktop/PhD/Research/Water Column Model/DUMMY/data.csv") # or other path...#
+DrivingData<-DrivingData[rowSums(DrivingData[,c(2,3)])!=0,] # removes rows of zeroes (these rows represent below the seabed)#
+#
+head(DrivingData)#
+times<-seq(0,5000,1)#
+Nz<-10 # fixed number of depth layers - in this code must = the hardwired value in the model function#
+#
+# Set up the vertical thickness of each cell#
+#------------------#
+#z=rep(180,max(DrivingData$Layer))                   # thickness of each cell is identical#
+#----#
+#z<-c(10,20,40,80,150,300,300,300,300,300)  # or.. define a vector of unequal thicknesses#
+#----#
+#
+# Extracted from Grid_W files, this is the numeric depth of each "Depth" layer in driving data#
+NEMO<-c(0.000000,   1.023907,    2.103190,    3.251309 ,   4.485053,    5.825238,     7.297443,    8.932686,   10.767898,   12.845992,   15.215269,   17.927923,   21.037571,   24.595987,   28.649651,   33.236965,   38.387100,   44.121010,   50.454468,   57.402565,   64.984604,   73.228699,   82.175560,   91.881409, 102.420174,  113.885239,  126.390930,  140.073975,  155.095047,  171.640244, 189.922791,  210.184464,  232.696976,  257.762878,  285.715790,  316.919861, 351.768005,  390.678619,  434.090546,  482.456329,  536.233215,  595.872070,  661.805237,  734.432129,  814.105652,  901.117981,  995.688538, 1097.954102, 1207.963013, 1325.672485, 1450.950439, 1583.582397, 1723.279785, 1869.693115, 2022.424927, 2181.044434, 2345.101074, 2514.137207, 2687.699463, 2865.346924,3046.659180, 3231.240479, 3418.722900, 3608.769287, 3801.072021, 3995.354248, 4191.367188, 4388.889648, 4587.725586, 4787.702148, 4988.667480, 5190.488281, 5393.049316, 5596.249023, 5800.000000)#
+# thickness of NEMO-MEDUSA layers#
+ z<-c()#
+for(i in 1:(length(NEMO)-1)){#
+ 	z[i]=NEMO[i+1]-NEMO[i]#
+ }	#
+# Trim down z to correspond with bathymetry of driving data.#
+#
+ z<-z[1:length(DrivingData$Layer)]								#
+#cz<-(-z[1]/2)#
+#for(q in (2:Nz)){#
+#cz<-c(cz,cz[q-1]-+(z[q-1]/2)-(z[q]/2))#
+#}#
+# Centre of box#
+cz<-c()#
+#
+for(i in 1:length(z)){#
+	cz[i]<-(NEMO[i]+NEMO[i+1])/2#
+}#
+zmax<-(sum(z))#
+# Comment/uncomment these lines to generate scenarios of sinking rate#
+#------------------#
+sS<-3#
+sB<-0.001#
+#----#
+#s<-seq(sS,sB,by=((sB-sS)/(length(z)-1)))  # sets up a vertical gradient in sinking rate#
+#----#
+s<-rep(sS, length(z))                      # or.. constant vertical sinking rate#
+# Comment/uncomment these lines to generate scenarios of particle replication rate#
+#------------------#
+rS<-0.0  # particle replication rate in the surface cell = 0#
+#rS<-0.02  # particle replication rate in the surface cell = 0.02#
+rB<-0.0  # particle replication rate in the deepest cell = 0#
+#rB<-0.02  # particle replication rate in the deepest cell = 0.02#
+#----#
+#r<-seq(rS,rB,by=((rB-rS)/(length(z)-1)))    # sets up a vertical gradient in replication rate#
+#----#
+r<-rep(rS,length(z))                        # constant replication rate at all depths#
+#----#
+#r<-c(rS,rep(0,length(z)-1))                  # or ... replication only at the surface#
+#----#
+#r<-c(rep(0,length(z)-1),rS)                 # or ... replication only at the bottom#
+#------------------#
+# k=rep(500,length(z))                    # Constant vertical diffusivity with depth adaptable to the driving 										#data#
+#
+ k=DrivingData$Vertical_diffusivity # Example of vector of vertical diffusivity extracted from dataset#
+#------------------#
+# Comment/uncomment these lines to generate scenarios of particle mortality rate#
+#------------------#
+mS<-0.0005#
+#----#
+m<-c(mS,rep(0,length(z)-1))                  # mortality only at the surface#
+#----#
+#m<-c(rep(0,length(z)-1),mS)                 # mortality only at the bottom#
+# Set up the initial conditions#
+#------------------#
+xstart<-rep(0,length(z)+1)  # set up a vector of zeros as the basis for the initial conditions#
+xstart[1]<-100000  # Start with particles only in the surface cell#
+#xstart[length(z)]<-100   # or ... start with particles only in the deepest cell#
+# element length(z)+1 is for the cumulative export flux#
+#
+#------------------#
+#------------------#
+#------------------#
+#------------------#
+parms<-c(z=z[1:length(z)], k=k[1:length(k)], s=s[1:length(s)], r=r[1:length(r)], m=m[1:length(m)])#
+parms#
+out<-as.data.frame(lsoda(xstart,times,model,parms))
+head(out)
+ttt<-100
+plot(as.numeric(out[ttt,2:(length(z)+2)]),NEMO[1:length(NEMO[1:(length(DrivingData$Layer)+1)])],type="l", xlab="Particles", ylab="Depth", )
+ymax<-0#
+for(zzz in 1:length(z)){#
+  ymax<-max(ymax,out[,zzz+1]/z[zzz])#
+}#
+ymax<-1.1*ymax#
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,2*max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+plot(out[,(length(z)+2)],type="l", ylab="No. of Particles", xlab="Time") # seabed abundance1
+temp<-rep(NA,5001)
+temp[1:5000]<-out[2:5001,length(z)+2]
+out[,(length(z)+3)]<-temp-out[,(length(z)+2)]
+plot(out[,(length(z)+3)],type="l", ylab="Flux of particles", xlab="Time", main="Particle Flux from base of water column") # seabed flux
+out[,length(z)+4]<-rowSums(out[,2:(length(z)+1)]) # total depth integrated population in the water column
+plot(out[,length(z)+4],type="l", ylab="No. of Particles", xlab="Time", main="Particles in water column") # depth integrated population
+tail(out)
+assign
+k
+for(i in 2:(izmax)){#
+      kd[i] <- k[i-1]/(z[i-1]+z[i]) # vertical diffusivity gradient (m/unit time)#
+    }
+head(DrivingData)
+plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,2*max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))
+}
+plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,2*max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,2*max(z)),#
+  ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+head(out)
+tail(out)
+list = ls(all.names = TRUE)
+list
+rm(list = ls(all.names = TRUE))
+model<-function(t,xx,parms){#
+  izmax<-length(xx)-1   # izmax = number of wet cells; xx[1]=time,xx[2:izmax+1]=particle numbers in each depth cell#
+  fz<-rep(0, izmax) # diffusion flux of particles between cells#
+  gz<-rep(0, izmax) # gravitational sinking flux of particles between cells#
+  rz<-rep(0, izmax) # replication flux of particles within cells#
+#
+   dxx<-list(c())#
+  with(as.list(parms),{#
+ #Assumes that kvert applies at the base of each layer  we expect kvert=0 at the sea surface#
+ 	kd<-rep(0, izmax) #
+    for(i in 2:(izmax)){#
+      kd[i] <- k[i-1]/(z[i-1]+z[i]) # vertical diffusivity gradient (m/unit time)#
+    }    #
+    md<-m/(z^2) # density dependent loss rate (/unit time)#
+      sd<-s/z     # gravitational loss rate  #
+    for(i in 2:(izmax-1)){#
+      fz[i]<-kd[i]*((xx[i]/z[i])-(xx[i-1]/z[i-1]))  # vertical diffusion flux = diffusivity gradient * concentration difference#
+      gz[i]<-sd[i]*xx[i]              # sinking flux = gravtiational loss rate * abundance#
+      rz[i]<-r[i]*xx[i]               # growth = growth rate * abundance#
+    }#
+    fz[1]<-0                              # Flux at the surface = 0 #
+    gz[1]<-(sd[1]*xx[1])                   # sinkingfrom the surface cell#
+    rz[1]<-(r[1]*xx[1])                   # growth in the surface cell#
+    fz[izmax]<-kd[izmax]*((xx[izmax]/z[izmax])-(xx[izmax-1]/z[izmax-1]))    # diffusion flux out of the bottom cell#
+    #-------------#
+    #Simplest option - a closed system (no export at the base) with no reproduction in the deepest layer#
+    # gz[izmax]<-0                      #no sinking export from the deepest layer#
+    # rz[izmax]<-0                      #no growth in the deepest layer#
+    #-------------#
+    #Option with an open system (export at the base) #
+    gz[izmax]<-(sd[izmax]*xx[izmax])   # export sinking out of the base of the model#
+    rz[izmax]<-(r[izmax]*xx[izmax])    # growth flux in the deepest cell#
+    #-------------#
+     # rate of change in abundance in surface cell#
+    dxx[[1]][1]<-assign("dxx1", (-fz[1]) + fz[2] - gz[1] + rz[1] - md[1]*(xx[1]^2))	#
+        # Assign function allows automation of setting up sequential variables.#
+    for(i in 2:(length(z)-1)){#
+    dxx[[1]][i]<-assign(paste0("dxx",i), (-fz[i] + fz[i+1] - gz[i] + gz[i-1] + rz[i] - md[i] * (xx[i])^2))#
+    }#
+     # dxx[[1]][length(z)]<-0 # closed no growth#
+   dxx[[1]][length(z)]<-assign(paste0("dxx", length(z)), (-fz[length(z)] - gz[length(z)] + gz[length(z)-1] + rz[length(z)] - md[length(z)] * xx[length(z)]^2))      	#open with growth#
+   #  dxx[[1]][length(z)+1]<-0 # exit flux - closed#
+     dxx[[1]][length(z)+1]<-assign(paste0("dxx", length(z)+1), gz[length(z)])          #exit flux - open with growth#
+    dxx#
+  })#
+}
+DrivingData<-read.csv("/Users/michael/Desktop/PhD/Research/Water Column Model/DUMMY/data.csv") # or other path...#
+DrivingData<-DrivingData[rowSums(DrivingData[,c(2,3)])!=0,] # removes rows of zeroes (these rows represent below the seabed)#
+times<-seq(0,2000,1)
+NEMO<-c(0.000000,   1.023907,    2.103190,    3.251309 ,   4.485053,    5.825238,
+7.297443,    8.932686,   10.767898,   12.845992,   15.215269,   17.927923,   21.037571,   24.595987,   28.649651,   33.236965,   38.387100,   44.121010,   50.454468,   57.402565,   64.984604,   73.228699,   82.175560,   91.881409, 102.420174,  113.885239,  126.390930,  140.073975,  155.095047,  171.640244, 189.922791,  210.184464,  232.696976,  257.762878,  285.715790,  316.919861, 351.768005,  390.678619,  434.090546,  482.456329,  536.233215,  595.872070,  661.805237,  734.432129,  814.105652,  901.117981,  995.688538, 1097.954102, 1207.963013, 1325.672485, 1450.950439, 1583.582397, 1723.279785, 1869.693115, 2022.424927, 2181.044434, 2345.101074, 2514.137207, 2687.699463, 2865.346924,3046.659180, 3231.240479, 3418.722900, 3608.769287, 3801.072021, 3995.354248, 4191.367188, 4388.889648, 4587.725586, 4787.702148, 4988.667480, 5190.488281, 5393.049316, 5596.249023, 5800.000000)
+z<-c()#
+for(i in 1:(length(NEMO)-1)){#
+ 	z[i]=NEMO[i+1]-NEMO[i]#
+ }
+z<-z[1:length(DrivingData$Layer)]
+z
+cz<-c()#
+#
+for(i in 1:length(z)){#
+	cz[i]<-(NEMO[i]+NEMO[i+1])/2#
+}
+zmax<-(sum(z))
+zmax
+sS<-3#
+sB<-0.001
+rS<-0.0  # particle replication rate in the surface cell = 0#
+#rS<-0.02  # particle replication rate in the surface cell = 0.02#
+rB<-0.0  # particle replication rate in the deepest cell = 0#
+#rB<-0.02  # particle replication rate in the deepest cell = 0.02
+r<-rep(rS,length(z))                        # constant replication rate at all depths
+k=DrivingData$Vertical_diffusivity # Example of vector of vertical diffusivity extracted from dataset
+mS<-0.0005#
+#----#
+m<-c(mS,rep(0,length(z)-1))
+xstart<-rep(0,length(z)+1)  # set up a vector of zeros as the basis for the initial conditions#
+xstart[1]<-100000  # Start with particles only in the surface cell
+parms<-c(z=z[1:length(z)], k=k[1:length(k)], s=s[1:length(s)], r=r[1:length(r)], m=m[1:length(m)])
+s<-rep(sS, length(z))                      # or.. constant vertical sinking rate
+mS<-0.0005#
+#----#
+m<-c(mS,rep(0,length(z)-1))
+xstart<-rep(0,length(z)+1)  # set up a vector of zeros as the basis for the initial conditions#
+xstart[1]<-100000  # Start with particles only in the surface cell
+parms<-c(z=z[1:length(z)], k=k[1:length(k)], s=s[1:length(s)], r=r[1:length(r)], m=m[1:length(m)])
+parms
+out<-as.data.frame(lsoda(xstart,times,model,parms))
+tail(out)
+require(deSolve)
+system("R CMD SHLIB MHModel.c")
+system("R CMD SHLIB MHModel.c")
+dyn.load("MHModel.so")
+DrivingData<-read.csv("/Users/michael/Desktop/PhD/Research/Water Column Model/DUMMY/data.csv") # or other path...#
+DrivingData<-DrivingData[rowSums(DrivingData[,c(2,3)])!=0,] # removes rows of zeroes (these rows represent below the seabed)#
+times<-seq(0,5000,1)#
+Nz<-10 # fixed number of depth layers - in this code must = the hardwired value in the model function#
+#
+# Set up the vertical thickness of each cell#
+#------------------#
+#z=rep(180,max(DrivingData$Layer))                   # thickness of each cell is identical#
+#----#
+z<-c(10,20,40,80,150,300,300,300,300,300)  # or.. define a vector of unequal thicknesses#
+#----#
+#
+# Extracted from Grid_W files, this is the numeric depth of each "Depth" layer in driving data#
+NEMO<-c(0.000000,   1.023907,    2.103190,    3.251309 ,   4.485053,    5.825238,#
+        7.297443,    8.932686,   10.767898,   12.845992,   15.215269,   17.927923,#
+        21.037571,   24.595987,   28.649651,   33.236965,   38.387100,   44.121010,#
+        50.454468,   57.402565,   64.984604,   73.228699,   82.175560,   91.881409,#
+        102.420174,  113.885239,  126.390930,  140.073975,  155.095047,  171.640244,#
+        189.922791,  210.184464,  232.696976,  257.762878,  285.715790,  316.919861,#
+        351.768005,  390.678619,  434.090546,  482.456329,  536.233215,  595.872070,#
+        661.805237,  734.432129,  814.105652,  901.117981,  995.688538, 1097.954102,#
+        1207.963013, 1325.672485, 1450.950439, 1583.582397, 1723.279785, 1869.693115,#
+        2022.424927, 2181.044434, 2345.101074, 2514.137207, 2687.699463, 2865.346924,#
+        3046.659180, 3231.240479, 3418.722900, 3608.769287, 3801.072021, 3995.354248,#
+        4191.367188, 4388.889648, 4587.725586, 4787.702148, 4988.667480, 5190.488281,#
+        5393.049316, 5596.249023, 5800.000000)#
+# thickness of NEMO-MEDUSA layers#
+z<-c()#
+for(i in 1:(length(NEMO)-1)){#
+  z[i]=NEMO[i+1]-NEMO[i]#
+}	#
+# Trim down z to correspond with bathymetry of driving data.#
+#
+z<-z[1:length(DrivingData$Layer)]								#
+#cz<-(-z[1]/2)#
+#for(q in (2:Nz)){#
+#cz<-c(cz,cz[q-1]-+(z[q-1]/2)-(z[q]/2))#
+#}#
+#
+# Centre of box#
+cz<-c()#
+#
+for(i in 1:length(z)){#
+  cz[i]<-(NEMO[i]+NEMO[i+1])/2#
+}#
+zmax<-(sum(z))#
+# Comment/uncomment these lines to generate scenarios of sinking rate#
+#------------------#
+sS<-3#
+sB<-0.001#
+#----#
+#s<-seq(sS,sB,by=((sB-sS)/(length(z)-1)))  # sets up a vertical gradient in sinking rate#
+#----#
+s<-rep(sS, length(z))                      # or.. constant vertical sinking rate#
+# Comment/uncomment these lines to generate scenarios of particle replication rate#
+#------------------#
+rS<-0.0  # particle replication rate in the surface cell = 0#
+#rS<-0.02  # particle replication rate in the surface cell = 0.02#
+rB<-0.0  # particle replication rate in the deepest cell = 0#
+#rB<-0.02  # particle replication rate in the deepest cell = 0.02#
+#----#
+#r<-seq(rS,rB,by=((rB-rS)/(length(z)-1)))    # sets up a vertical gradient in replication rate#
+#----#
+r<-rep(rS,length(z))                     # constant replication rate at all depths#
+#----#
+#r<-c(rS,rep(0,length(z)-1))                  # or ... replication only at the surface#
+#----#
+#r<-c(rep(0,length(z)-1),rS)                 # or ... replication only at the bottom#
+#------------------#
+# k=rep(500,length(z))                    # Constant vertical diffusivity with depth adaptable to the driving 										#data#
+#
+k=DrivingData$Vertical_diffusivity # Example of vector of vertical diffusivity extracted from dataset#
+#
+k=k[1:10]#
+#
+#------------------#
+# Comment/uncomment these lines to generate scenarios of particle mortality rate#
+#------------------#
+mS<-0.0005#
+#----#
+m<-c(mS,rep(0,length(z)-1))                  # mortality only at the surface#
+#----#
+#m<-c(rep(0,length(z)-1),mS)                 # mortality only at the bottom#
+# Set up the initial conditions#
+#------------------#
+xstart<-rep(0,length(z[1:10])+1)  # set up a vector of zeros as the basis for the initial conditions#
+xstart[1]<-100000  # Start with particles only in the surface cell#
+#xstart[length(z)]<-100   # or ... start with particles only in the deepest cell#
+# element length(z)+1 is for the cumulative export flux#
+#
+#------------------#
+#------------------#
+#------------------#
+#------------------#
+parms<-c(z=z[1:10],  s=s[1:10],  m=m[1:10], r=r[1:10], k=k[1:10])#
+xstart<-rep(0,11)#
+xstart[1]=10000#
+fcontrol<-list(method="linear", rule=2, ties="ordered")
+out<-(lsoda(xstart, times, func="derivsc", parms=parms,#
+                         dllname = "MHModel", initfunc="odec",#
+                          fcontrol = fcontrol))
+tail(out)
+times<-seq(0,5000,1)
+system("R CMD SHLIB MHModel.c")
+dyn.load("MHModel.so")
+times<-seq(0,5000,1)#
+#
+Nz<-10  # number of depth layers - in this code must = the hardwired value in the model function#
+#
+# Set up the vertical thickness of each cell#
+#------------------#
+z=rep(180,Nz)                    # thickness of each cell is identical#
+#----#
+#z<-c(10,20,40,80,150,300,300,300,300,300)  # or.. define a vector of unequal thicknesses#
+#----#
+cz<-(-z[1]/2)#
+for(q in (2:Nz)){#
+cz<-c(cz,cz[q-1]-+(z[q-1]/2)-(z[q]/2))#
+}#
+zmax<-(-sum(z))#
+# Comment/uncomment these lines to generate scenarios of sinking rate#
+#------------------#
+sS<-3#
+sB<-0.001#
+#----#
+#s<-seq(sS,sB,by=((sB-sS)/(Nz-1)))  # sets up a vertical gradient in sinking rate#
+#----#
+   s<-rep(sS, Nz)                      # or.. constant vertical sinking rate#
+# Comment/uncomment these lines to generate scenarios of particle replication rate#
+#------------------#
+rS<-0.0  # particle replication rate in the surface cell = 0#
+#rS<-0.02  # particle replication rate in the surface cell = 0.02#
+rB<-0.0  # particle replication rate in the deepest cell = 0#
+#rB<-0.02  # particle replication rate in the deepest cell = 0.02#
+#----#
+#r<-seq(rS,rB,by=((rB-rS)/(Nz-1)))    # sets up a vertical gradient in replication rate#
+#----#
+#r<-rep(rS,Nz)                        # constant replication rate at all depths#
+#----#
+     r<-c(rS,rep(0,Nz-1))                  # or ... replication only at the surface#
+#----#
+#r<-c(rep(0,Nz-1),rS)                 # or ... replication only at the bottom#
+#------------------#
+k=rep(500,Nz)                         # Constant vertical diffusivity with depth#
+#------------------#
+# Comment/uncomment these lines to generate scenarios of particle mortality rate#
+#------------------#
+mS<-0.0005#
+#----#
+   m<-c(mS,rep(0,Nz-1))                  # mortality only at the surface#
+#----#
+#m<-c(rep(0,Nz-1),mS)                 # mortality only at the bottom#
+# Set up the initial conditions#
+#------------------#
+xstart<-rep(0,11)  # set up a vector of zeros as the basis for the initial conditions#
+xstart[1]<-100000  # Sart with particles only in the surface cell#
+#xstart[10]<-100   # or ... streat with particles only in teh deepest cell#
+                   # element 11 is for the cumulative export flux#
+#
+#------------------#
+#------------------#
+#------------------#
+#------------------#
+parms<-c(z1=z[1],z2=z[2],z3=z[3],z4=z[4],z5=z[5],z6=z[6],z7=z[7],z8=z[8],z9=z[9],z10=z[10],#
+         s1=s[1],s2=s[2],s3=s[3],s4=s[4],s5=s[5],s6=s[6],s7=s[7],s8=s[8],s9=s[9],s10=s[10],#
+         m1=m[1],m2=m[2],m3=m[3],m4=m[4],m5=m[5],m6=m[6],m7=m[7],m8=m[8],m9=m[9],m10=m[10],#
+         r1=r[1],r2=r[2],r3=r[3],r4=r[4],r5=r[5],r6=r[6],r7=r[7],r8=r[8],r9=r[9],r10=r[10],#
+         k1=k[1],k2=k[2],k3=k[3],k4=k[4],k5=k[5],k6=k[6],k7=k[7],k8=k[8],k9=k[9],k10=k[10]#
+        )#
+#
+fcontrol<-list(method="linear", rule=2, ties="ordered")
+out<-as.data.frame(lsoda(xstart, times, func="derivsc", parms=parms,#
+                         dllname = "MHModel", initfunc="odec",#
+                          fcontrol = fcontrol))
+tail(out)
+ttt<-100
+plot(as.numeric(out[ttt,2:(length(z[1:10])+2)]),NEMO[1:length(NEMO[1:(length(DrivingData$Layer[1:10])+1)])],type="l", xlab="Particles", ylab="Depth", )
+ymax<-0
+for(zzz in 1:length(z[1:10])){#
+  ymax<-max(ymax,out[,zzz+1]/z[zzz])#
+}#
+ymax
+ymax<-1.1*ymax
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,2*max(z)),#
+       ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+rev(range(c(0,max(cz))))
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=rev(range(c(0,max(cz)))),type="l", xlim=c(0,2*max(z)),#
+       ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,ylim=range(c(0,max(cz))),type="l", xlim=c(0,2*max(z)),#
+       ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+for(ttt in 1:5000){#
+  #plot(as.numeric(out[ttt,2:(length(z)+2])),seq(1,110,by=10),xlim=c(0,100), ylim=rev(range(c(100,0))),type="l")#
+  plot(as.numeric(out[ttt,2:(length(z)+1)]/z),cz,type="l", xlim=c(0,2*max(z)),#
+       ylab="Sea Depth (m)", xlab="Particle Concentration", main=paste0("Particle Concentration in Water Column at timestep ", ttt))#
+}
+plot(out[,(length(z[1:10])+2)],type="l", ylab="No. of Particles", xlab="Time") # seabed abundance1
+temp<-rep(NA,5001)#
+temp[1:5000]<-out[2:5001,length(z)+2]#
+out[,(length(z[1:10])+3)]<-temp-out[,(length(z[1:10])+2)]#
+plot(out[,(length(z)+3)],type="l", ylab="Flux of particles", xlab="Time", main="Particle Flux from base of water column") # seabed flux
+out[,length(z)+4]<-rowSums(out[,2:(length(z)+1)]) # total depth integrated population in the water column#
+plot(out[,length(z)+4],type="l", ylab="No. of Particles", xlab="Time", main="Particles in water column") # depth integrated population
