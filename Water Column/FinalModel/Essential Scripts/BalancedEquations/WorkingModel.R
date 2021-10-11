@@ -23,7 +23,7 @@ fcontrol<-list(method="linear", rule=2, ties="ordered")
 
 
 out<-as.data.frame(deSolve::lsoda(xstart, times, func="derivsc", parms, 
-        dllname="DiffModel", initfunc="initmod", jactype="bandint", 
+        dllname="DiffModelch", initfunc="initmod", jactype="bandint", 
         bandup=1, banddown=1, initforc = "forcc", fcontrol=fcontrol,
         forcings=dat))
 

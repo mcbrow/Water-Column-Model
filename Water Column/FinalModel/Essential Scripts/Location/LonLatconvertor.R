@@ -1,8 +1,10 @@
 install.packages("sf", type ='source', repo ='cran.rstudio.com')
-
+install.packages("raster")
 install.packages("rgdal", repo = 'https://mac.R-project.org')
 remotes::install_github("r-spatial/sf", configure.args = "--with-proj-lib=/usr/local/lib/")
 
+
+install.packages("nngeo")
 library(tidyverse)
 library(ncdf4)
 library(tidyr)

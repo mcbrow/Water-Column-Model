@@ -1,6 +1,6 @@
 library(tidyverse)
 library(data.table)
-files<-list.files("/Users/michael/NEMOMEDUSA/ALLARC", recursive=TRUE, 
+files<-list.files("/Users/michael/NEMOMEDUSA/ALLARC/2002", recursive=TRUE, 
                   full.names = TRUE) %>% 
   as.data.frame() %>% 
   rename(filename='.') %>% 
@@ -11,13 +11,13 @@ head(files)
 future::plan("multiprocess")
 
 
-
+files
 
 data<-filter(files, str_detect(filename, 'grid_W_')) %>% 
-  furrr::future_pmap(VerVel, x=1021, y=173, .progress=TRUE) %>% 
+  furrr::future_pmap(NEMO_MEDUSA, analysis="1D", x=1021, y=173,  .progress=TRUE) %>% 
   rbindlist()
 
-
+NEMO_MEDUSA
 
 data1<-filter(data, str_starts(data$Date,"2002"))
 

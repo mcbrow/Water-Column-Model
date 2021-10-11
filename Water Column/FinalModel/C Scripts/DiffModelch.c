@@ -18,7 +18,7 @@ struct par
   double r[74];
   double m[74];
   double Ipm[74];
-  double theta0[74];
+  double ambtemp[74];
   double Hn[74];
   double HL[74];
   double kappab[74];
@@ -52,11 +52,11 @@ void initmod(void(* odeparms)(int *, double *,  double *, double *,
                   double *, double *,  double *, double *, double *,
                   double *, double *, double *))
 {
-  int N=1115;
+  int N=893;
  
-  odeparms(&N, &parms.z[0], &parms.s[0], &parms.r[0], &parms.m[0], 
-           &parms.Ipm[0],
-            &parms.theta0[0], &parms.HL[0],
+  odeparms(&N, &parms.z[0], &parms.s[0], &parms.r[0], 
+           &parms.m[0], &parms.Ipm[0],
+            &parms.ambtemp[0], &parms.HL[0],
             &parms.HL[0], &parms.kappab[0], &parms.kappap[0],
             &parms.V[0], &parms.depth[0], &parms.odechoice[0],
             &parms.sinkingchoice[0], &parms.growthchoice[0], 
@@ -70,7 +70,7 @@ void initmod(void(* odeparms)(int *, double *,  double *, double *,
 struct force{
   
   double k[75];
-  double theta[75];
+  double temp[75];
   double Ls[75];
 
   };
@@ -82,7 +82,7 @@ struct force forc;
 void forcc(void (* odeforcs)(int*, double*, double *, double *))
 {
   int N=225;
-  odeforcs(&N, &forc.k[0], &forc.theta[75], &forc.Ls[75]);
+  odeforcs(&N, &forc.k[0], &forc.temp[75], &forc.Ls[75]);
   }
 
 
@@ -141,7 +141,7 @@ in C than in R. Structures are faster and less laborious to type out than macros
     /* Growth in the surface cell */
     dyn.rz[i]=parms.r[i]*y[i];
     /* */
-    dyn.Stheta[i]=1-exp(-forc.theta[i]/parms.theta0[i]);
+    dyn.Stheta[i]=1-exp(-forc.temp[i]/parms.ambtemp[i]);
     /* */
     dyn.L[i]=forc.Ls[i]*exp(-dyn.kappa[i]*parms.z[i]);
     /* */ 
@@ -198,7 +198,7 @@ in C than in R. Structures are faster and less laborious to type out than macros
    this case ... = int. */
   
   
-    ydot[0]                 =    -dyn.fz[0]  +  dyn.fz[1]       -dyn.gz[0]  +        dyn.rz[0]           -dyn.md[0]*pow(y[0],2) + dyn.Up[0];
+    ydot[0]                 =    -dyn.fz[0]  +  dyn.fz[1]       -dyn.gz[0]  +        dyn.rz[0]           -dyn.md[0]*pow(y[0],2) + ydot[];
   
   for(int i=1; i<(int)parms.n[0]; ++i){
     
@@ -241,8 +241,9 @@ in C than in R. Structures are faster and less laborious to type out than macros
      ydot[i] = 0;
      
 }
+  /* Placeholder for Phytoplankton equation */
   
-    
+    ydot[(int)parms.n[0]+1]= dyn.Up;
   
   
 }
