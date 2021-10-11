@@ -8,10 +8,6 @@ DrivingData<-read.csv("/Users/michael/Desktop/PhD/Research/Water Column Model/DU
 #DrivingData<-DrivingData[rowSums(DrivingData[,c(2,3)])!=0,] # removes rows of zeroes #(these rows represent below the seabed)
 
 
-times<-seq(0,3600,1)
-
-
-n<-74 # fixed number of depth layers - in this code must = the hardwired value in the model function
 
 # Set up the vertical thickness of each cell
 #------------------
@@ -115,3 +111,12 @@ m<-c(mS,rep(0,length(z)-1))                  # mortality only at the surface
 #------------------
 #------------------
 #------------------
+
+Ipm<-rep(1.6,74)
+HL<-rep(60,74)
+kappab<-rep(0.22, 74)
+kappap<-rep(0.008, 74)
+V<-rep(1,74)
+ambtemp<-rep(6, 74)
+
+

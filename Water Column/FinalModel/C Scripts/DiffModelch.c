@@ -50,8 +50,7 @@ First element is the number of parameters copied over from R. int N=... must be 
 void initmod(void(* odeparms)(int *, double *,  double *, double *, 
                   double *, double *, double *, double *, double *, 
                   double *, double *,  double *, double *, double *,
-                  double *, double *, double *, double *, double *,
-                  double *))
+                  double *, double *, double *))
 {
   int N=1115;
  
