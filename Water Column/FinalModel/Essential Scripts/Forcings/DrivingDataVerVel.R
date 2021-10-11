@@ -2,13 +2,40 @@ times<-seq(1,365,1)
 nyears<-2
 
 
-vec<-2:76
-fun<-function(x){
-  data.frame(times=seq(1,72,1), 
-             "VerticalVelocity"=IrmingerBasin[,x])
+
+IrmingerData1<-arrange(IrmingerData, Layer)
+IrmingerData1<-IrmingerData
+IrmingerData1$Vertical_diffusivity<-ifelse(IrmingerData1$Vertical_diffusivity>0.15, 
+                                           0.15, IrmingerData1$Vertical_diffusivity)
+
+Vertical_diffusivity<-as.data.frame(IrmingerData1$Vertical_diffusivity)
+
+VerDiff<-list()
+
+for(i in 0:74){
+  
+  
+  VerDiff[[i+1]]<-as.matrix(data.frame(times=seq(1,72,1), VerDiff=Vertical_diffusivity[i+(1:72),]))
+    
 }
 
-dat<-lapply(vec, fun)
+IrmingerData1$Temperature
+Temperature<-as.data.frame(IrmingerData1$Temperature)
+
+
+Temp<-list()
+
+for(i in 0:74){
+  
+  
+  Temp[[i+1]]<-as.matrix(data.frame(times=seq(1,72,1), VerDiff=Temperature[i+(1:72),]))
+  
+}
+
+
+
+
+
 
 
 
