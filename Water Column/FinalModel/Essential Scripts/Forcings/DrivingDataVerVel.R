@@ -5,10 +5,13 @@ nyears<-2
 vec<-2:76
 fun<-function(x){
   data.frame(times=seq(1,72,1), 
-             "VerticalVelocity"=data2[,x])
+             "VerticalVelocity"=IrmingerBasin[,x])
 }
 
 dat<-lapply(vec, fun)
+
+
+
 
 replicate_data<-function(file){ 
   obs<-nrow(file) 

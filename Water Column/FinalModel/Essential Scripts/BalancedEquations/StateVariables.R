@@ -1,5 +1,8 @@
 
 
+
+times<-seq(0,3600,1)
+
 # Set up the initial conditions
 #------------------
 xstart<-rep(0,length(z))  # set up a vector of zeros as the basis for the initial conditions

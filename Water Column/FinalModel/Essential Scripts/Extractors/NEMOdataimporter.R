@@ -28,8 +28,8 @@ data<-function(path, outputfile, n, m){
 }
   
 tic()
-data("/Users/michael/NEMOMEDUSA/ALLARC", 
-     "/Users/michael/Desktop/PhD/Research/NEMOData/DUMMY", 1021, 73)
+data("/Users/michael/NEMOMEDUSA/ALLARC/2002", 
+     "/Users/michael/Desktop/PhD/Research Methods/Water Column Models/Water Column/FinalModel/Data", 1021, 73)
 toc()  
   
 
