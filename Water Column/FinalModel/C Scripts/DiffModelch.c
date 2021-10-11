@@ -17,6 +17,17 @@ struct par
   double s[74];
   double r[74];
   double m[74];
+  double Ipm[74];
+  double theta[74];
+  double theta0[74];
+  double Hxx[74];
+  double Hn[74];
+  double HL[74];
+  double Ls[74];
+  double kappab[74];
+  double kappap[74];
+  double V[74];
+  double depth[75];
   double odechoice[1];
   double sinkingchoice[1];
   double growthchoice[1];
@@ -40,12 +51,18 @@ First element is the number of parameters copied over from R. int N=... must be 
  number of parameters as in R or it will give an error. 
  */
 void initmod(void(* odeparms)(int *, double *,  double *, double *, 
-                  double *, double *, double *, double *, double *))
+                  double *, double *, double *, double *, double *, 
+                  double *, double *,  double *, double *, double *,
+                  double *, double *, double *, double *, double *,
+                  double *))
 {
-  int N=300;
+  int N=1115;
  
-  odeparms(&N, &parms.z[0], &parms.s[0], 
-           &parms.r[0], &parms.m[0], &parms.odechoice[0],
+  odeparms(&N, &parms.z[0], &parms.s[0], &parms.r[0], &parms.m[0], 
+           &parms.Ipm[0], &parms.theta[0],
+            &parms.theta0[0], &parms.Hxx[0], &parms.HL[0],
+            &parms.HL[0], &parms.Ls[0], &parms.kappab[0], &parms.kappap[0],
+            &parms.V[0], &parms.depth[0], &parms.odechoice[0],
             &parms.sinkingchoice[0], &parms.growthchoice[0], 
             &parms.n[0]);
   
@@ -57,6 +74,7 @@ void initmod(void(* odeparms)(int *, double *,  double *, double *,
 struct force{
   
   double k[75];
+
   };
 
 
@@ -91,6 +109,11 @@ in C than in R. Structures are faster and less laborious to type out than macros
     double gz[75];
     double fz[75];
     double rz[75];
+    double Ip[75];
+    double kappa[75];
+    double Up[75];
+    double Stheta[75];
+    double  L[75];
     };
   
   struct var dyn;
@@ -119,11 +142,23 @@ in C than in R. Structures are faster and less laborious to type out than macros
     dyn.gz[i]=dyn.sd[i]*y[i];
     /* Growth in the surface cell */
     dyn.rz[i]=parms.r[i]*y[i];
+    /* */
+    dyn.Stheta[i]=1-exp(-parms.theta[i]/parms.theta0[i]);
+    /* */
+    dyn.L[i]=parms.Ls[i]*exp(-dyn.kappa[i]*parms.z[i]);
+    /* */ 
+    dyn.Ip[i]=parms.Ipm[i]*dyn.Stheta[i];
+    /* */
+    dyn.kappa[i]=parms.kappab[i]+parms.kappap[i]*ydot[i]/parms.V[i];
+    /* */
+    dyn.Up[i]=ydot[(int)parms.n[75]+1]*dyn.Ip[i]/dyn.kappa[i]*parms.depth[i]*
+    ydot[i]/ydot[i]+(parms.V[i]*parms.Hn[i])*log((parms.Ls[i]+parms.HL[i])/
+      (parms.Ls[i]*exp((-dyn.kappa[i]*parms.depth[i])+parms.HL[i])));
   }
   
  /* Switching function between sinking/no sinking
   This is called as a parameter in same way as 'n' was and 
-  converted from double to integer*/ 
+  converted from double to integer */ 
   switch((int)parms.sinkingchoice[0]){
   
   case 1:
@@ -159,19 +194,17 @@ in C than in R. Structures are faster and less laborious to type out than macros
   
   /* Derivatives */
   
-  /* The indexing element of an array must be an integer (i.e y[i], where i is the indexing element
-  must be a positive integer from 0 to inf), however the structure element parms.n[0] is called from R 
-   as a double as that was the only way to retrieve it from R. To fix this we have to coerce it into integer form.
-  This is referred to in C as type casting and the command to do this is (...), where in
-   this case ... = int. The brackets around int are important, this is the syntax for typecasting. It 
-  won't work without the brackets.*/
+  /* The indexing element of an array must be an integer, however the structure element parms.n[0] is called from R 
+   as a double by default. To fix this coerce it into integer form.
+  This is referred to in C as typecasting and the command to do this is (...), where in
+   this case ... = int. */
   
   
-    ydot[0]                 =    -dyn.fz[0]  +  dyn.fz[1]       -dyn.gz[0]  +                                          dyn.rz[0]           -dyn.md[0]*pow(y[0],2);
+    ydot[0]                 =    -dyn.fz[0]  +  dyn.fz[1]       -dyn.gz[0]  +        dyn.rz[0]           -dyn.md[0]*pow(y[0],2) + dyn.Up[0];
   
   for(int i=1; i<(int)parms.n[0]; ++i){
     
-    ydot[i]                 =    -dyn.fz[i] +  dyn.fz[i+1]      -dyn.gz[i]  +             dyn.gz[i-1]  +               dyn.rz[i]           -dyn.md[i]*pow(y[i],2);
+    ydot[i]                 =    -dyn.fz[i] +  dyn.fz[i+1]      -dyn.gz[i]  +             dyn.gz[i-1]  +               dyn.rz[i]           -dyn.md[i]*pow(y[i],2) + dyn.Up[i];
   }
   
   switch((int)parms.odechoice[0]){
@@ -188,7 +221,7 @@ in C than in R. Structures are faster and less laborious to type out than macros
     
   case 2:
     
-    ydot[(int)parms.n[0]]   =   -dyn.fz[(int)parms.n[0]] +          -dyn.gz[(int)parms.n[0]] +     dyn.gz[(int)parms.n[0]-1]  +  dyn.rz[(int)parms.n[0]]  -dyn.md[(int)parms.n[0]]*pow(y[(int)parms.n[0]],2) ;
+    ydot[(int)parms.n[0]]   =   -dyn.fz[(int)parms.n[0]] +          -dyn.gz[(int)parms.n[0]] +     dyn.gz[(int)parms.n[0]-1]  +  dyn.rz[(int)parms.n[0]]  -dyn.md[(int)parms.n[0]]*pow(y[(int)parms.n[0]],2) + dyn.Up[(int)parms.n[0]];
     
     ydot[(int)parms.n[0]+1] = 0;
     
@@ -196,14 +229,13 @@ in C than in R. Structures are faster and less laborious to type out than macros
       
       
   case 3:
-    ydot[(int)parms.n[0]]   =    -dyn.fz[(int)parms.n[0]] +          -dyn.gz[(int)parms.n[0]] +     dyn.gz[(int)parms.n[0]-1]  +  dyn.rz[(int)parms.n[0]]  -dyn.md[(int)parms.n[0]]*pow(y[(int)parms.n[0]],2) ;
+    ydot[(int)parms.n[0]]   =    -dyn.fz[(int)parms.n[0]] +          -dyn.gz[(int)parms.n[0]] +     dyn.gz[(int)parms.n[0]-1]  +  dyn.rz[(int)parms.n[0]]  -dyn.md[(int)parms.n[0]]*pow(y[(int)parms.n[0]],2) + dyn.Up[(int)parms.n[0]] ;
   
-    ydot[(int)parms.n[0]+1] =                                            dyn.gz[(int)parms.n[0]];
+    ydot[(int)parms.n[0]+1] =                                            dyn.gz[(int)parms.n[0]] + dyn.Up[(int)parms.n[0]+1];
     
    break;
    
-   
-   
+  
 
 }
  for(int i=(int)parms.n[0]+2; i<=74; ++i){
@@ -212,7 +244,7 @@ in C than in R. Structures are faster and less laborious to type out than macros
      
 }
   
-  
+    
   
   
 }
