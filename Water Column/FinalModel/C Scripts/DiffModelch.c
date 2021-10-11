@@ -18,12 +18,9 @@ struct par
   double r[74];
   double m[74];
   double Ipm[74];
-  double theta[74];
   double theta0[74];
-  double Hxx[74];
   double Hn[74];
   double HL[74];
-  double Ls[74];
   double kappab[74];
   double kappap[74];
   double V[74];
@@ -59,9 +56,9 @@ void initmod(void(* odeparms)(int *, double *,  double *, double *,
   int N=1115;
  
   odeparms(&N, &parms.z[0], &parms.s[0], &parms.r[0], &parms.m[0], 
-           &parms.Ipm[0], &parms.theta[0],
-            &parms.theta0[0], &parms.Hxx[0], &parms.HL[0],
-            &parms.HL[0], &parms.Ls[0], &parms.kappab[0], &parms.kappap[0],
+           &parms.Ipm[0],
+            &parms.theta0[0], &parms.HL[0],
+            &parms.HL[0], &parms.kappab[0], &parms.kappap[0],
             &parms.V[0], &parms.depth[0], &parms.odechoice[0],
             &parms.sinkingchoice[0], &parms.growthchoice[0], 
             &parms.n[0]);
@@ -74,6 +71,8 @@ void initmod(void(* odeparms)(int *, double *,  double *, double *,
 struct force{
   
   double k[75];
+  double theta[75];
+  double Ls[75];
 
   };
 
@@ -81,10 +80,10 @@ struct force{
 
 struct force forc;
 
-void forcc(void (* odeforcs)(int*, double*))
+void forcc(void (* odeforcs)(int*, double*, double *, double *))
 {
-  int N=75;
-  odeforcs(&N, &forc.k[0]);
+  int N=225;
+  odeforcs(&N, &forc.k[0], &forc.theta[75], &forc.Ls[75]);
   }
 
 
@@ -143,17 +142,17 @@ in C than in R. Structures are faster and less laborious to type out than macros
     /* Growth in the surface cell */
     dyn.rz[i]=parms.r[i]*y[i];
     /* */
-    dyn.Stheta[i]=1-exp(-parms.theta[i]/parms.theta0[i]);
+    dyn.Stheta[i]=1-exp(-forc.theta[i]/parms.theta0[i]);
     /* */
-    dyn.L[i]=parms.Ls[i]*exp(-dyn.kappa[i]*parms.z[i]);
+    dyn.L[i]=forc.Ls[i]*exp(-dyn.kappa[i]*parms.z[i]);
     /* */ 
     dyn.Ip[i]=parms.Ipm[i]*dyn.Stheta[i];
     /* */
     dyn.kappa[i]=parms.kappab[i]+parms.kappap[i]*ydot[i]/parms.V[i];
     /* */
     dyn.Up[i]=ydot[(int)parms.n[75]+1]*dyn.Ip[i]/dyn.kappa[i]*parms.depth[i]*
-    ydot[i]/ydot[i]+(parms.V[i]*parms.Hn[i])*log((parms.Ls[i]+parms.HL[i])/
-      (parms.Ls[i]*exp((-dyn.kappa[i]*parms.depth[i])+parms.HL[i])));
+    ydot[i]/ydot[i]+(parms.V[i]*parms.Hn[i])*log((forc.Ls[i]+parms.HL[i])/
+      (forc.Ls[i]*exp((-dyn.kappa[i]*parms.depth[i])+parms.HL[i])));
   }
   
  /* Switching function between sinking/no sinking

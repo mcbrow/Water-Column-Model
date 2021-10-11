@@ -1,18 +1,22 @@
+
+
 # Package Load #
 
 source("/Users/michael/Desktop/PhD/Research Methods/Water Column Models/Water Column/Essentials/PackageList.R")
 
+# Load Parameters
+
 source("/Users/michael/Desktop/PhD/Research Methods/Water Column Models/Water Column/FinalModel/Essential Scripts/BalancedEquations/Parameters.R")
 
-system("R CMD SHLIB DiffModel.c")
-dyn.load("DiffModel.so")
 
-getwd()
+system("R CMD SHLIB DiffModelch.c")
+dyn.load("DiffModelch.so")
+
 
 parms<-c(z=z[1:length(z)], s=s[1:length(s)], r=r[1:length(r)], 
-         m=m[1:length(m)], odechoice=1, sinkingchoice=1, growthchoice=1, n=57)
+         m=m[1:length(m)], odechoice=1, sinkingchoice=1, depth= growthchoice=1, n=57)
          
-parms
+
 
 fcontrol<-list(method="linear", rule=2, ties="ordered")
 
