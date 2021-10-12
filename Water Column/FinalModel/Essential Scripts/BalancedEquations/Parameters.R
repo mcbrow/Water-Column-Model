@@ -4,7 +4,7 @@ setwd("/Users/michael/Desktop/PhD/Research Methods/Water Column Models/Water Col
 
 
 # Driving data containing profile of Depths and Vertical Diffusivity
-DrivingData<-read.csv("/Users/michael/Desktop/PhD/Research/Water Column Model/DUMMY/data.csv") # or other path...
+DrivingData<-read.csv("/Users/michael/Desktop/PhD/Research Methods/Water Column Models/Water Column/FinalModel/Data/IrmingerBasin.csv") # or other path...
 #DrivingData<-DrivingData[rowSums(DrivingData[,c(2,3)])!=0,] # removes rows of zeroes #(these rows represent below the seabed)
 
 

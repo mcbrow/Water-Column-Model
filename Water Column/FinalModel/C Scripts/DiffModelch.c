@@ -17,14 +17,6 @@ struct par
   double s[74];
   double r[74];
   double m[74];
-  double Ipm[74];
-  double ambtemp[74];
-  double Hn[74];
-  double HL[74];
-  double kappab[74];
-  double kappap[74];
-  double V[74];
-  double depth[75];
   double odechoice[1];
   double sinkingchoice[1];
   double growthchoice[1];
@@ -48,17 +40,13 @@ First element is the number of parameters copied over from R. int N=... must be 
  number of parameters as in R or it will give an error. 
  */
 void initmod(void(* odeparms)(int *, double *,  double *, double *, 
-                  double *, double *, double *, double *, double *, 
-                  double *, double *,  double *, double *, double *,
-                  double *, double *, double *))
+                  double *, double *, double *, double *, 
+                  double *))
 {
   int N=893;
  
   odeparms(&N, &parms.z[0], &parms.s[0], &parms.r[0], 
-           &parms.m[0], &parms.Ipm[0],
-            &parms.ambtemp[0], &parms.HL[0],
-            &parms.HL[0], &parms.kappab[0], &parms.kappap[0],
-            &parms.V[0], &parms.depth[0], &parms.odechoice[0],
+           &parms.m[0],  &parms.odechoice[0],
             &parms.sinkingchoice[0], &parms.growthchoice[0], 
             &parms.n[0]);
   
@@ -69,9 +57,9 @@ void initmod(void(* odeparms)(int *, double *,  double *, double *,
 
 struct force{
   
-  double k[75];
+  double verdiff[75];
   double temp[75];
-  double Ls[75];
+  double ndc[75];
 
   };
 
@@ -81,8 +69,8 @@ struct force forc;
 
 void forcc(void (* odeforcs)(int*, double*, double *, double *))
 {
-  int N=225;
-  odeforcs(&N, &forc.k[0], &forc.temp[75], &forc.Ls[75]);
+  int N=150;
+  odeforcs(&N, &forc.verdiff[0], &forc.temp[75]);
   }
 
 
@@ -107,11 +95,6 @@ in C than in R. Structures are faster and less laborious to type out than macros
     double gz[75];
     double fz[75];
     double rz[75];
-    double Ip[75];
-    double kappa[75];
-    double Up[75];
-    double Stheta[75];
-    double  L[75];
     };
   
   struct var dyn;
@@ -141,17 +124,7 @@ in C than in R. Structures are faster and less laborious to type out than macros
     /* Growth in the surface cell */
     dyn.rz[i]=parms.r[i]*y[i];
     /* */
-    dyn.Stheta[i]=1-exp(-forc.temp[i]/parms.ambtemp[i]);
-    /* */
-    dyn.L[i]=forc.Ls[i]*exp(-dyn.kappa[i]*parms.z[i]);
-    /* */ 
-    dyn.Ip[i]=parms.Ipm[i]*dyn.Stheta[i];
-    /* */
-    dyn.kappa[i]=parms.kappab[i]+parms.kappap[i]*ydot[i]/parms.V[i];
-    /* */
-    dyn.Up[i]=ydot[(int)parms.n[75]+1]*dyn.Ip[i]/dyn.kappa[i]*parms.depth[i]*
-    ydot[i]/ydot[i]+(parms.V[i]*parms.Hn[i])*log((forc.Ls[i]+parms.HL[i])/
-      (forc.Ls[i]*exp((-dyn.kappa[i]*parms.depth[i])+parms.HL[i])));
+    
   }
   
  /* Switching function between sinking/no sinking
@@ -198,7 +171,7 @@ in C than in R. Structures are faster and less laborious to type out than macros
    this case ... = int. */
   
   
-    ydot[0]                 =    -dyn.fz[0]  +  dyn.fz[1]       -dyn.gz[0]  +        dyn.rz[0]           -dyn.md[0]*pow(y[0],2) + ydot[];
+    ydot[0]                 =    -dyn.fz[0]  +  dyn.fz[1]       -dyn.gz[0]  +        dyn.rz[0]           -dyn.md[0]*pow(y[0],2) 
   
   for(int i=1; i<(int)parms.n[0]; ++i){
     
@@ -243,7 +216,7 @@ in C than in R. Structures are faster and less laborious to type out than macros
 }
   /* Placeholder for Phytoplankton equation */
   
-    ydot[(int)parms.n[0]+1]= dyn.Up;
+    ydot[(int)parms.n[0]+1] =  0;
   
   
 }
