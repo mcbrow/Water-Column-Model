@@ -17,6 +17,17 @@ struct par
   double s[74];
   double r[74];
   double m[74];
+<<<<<<< HEAD
+=======
+  double Ipm[74];
+  double ambtemp[74];
+  double Hn[74];
+  double HL[74];
+  double kappab[74];
+  double kappap[74];
+  double V[74];
+  double depth[75];
+>>>>>>> 828c798178582effcec8e552d40e5f1ece41b4f8
   double odechoice[1];
   double sinkingchoice[1];
   double growthchoice[1];
@@ -43,10 +54,20 @@ void initmod(void(* odeparms)(int *, double *,  double *, double *,
                   double *, double *, double *, double *, 
                   double *))
 {
+<<<<<<< HEAD
   int N=301;
  
   odeparms(&N, &parms.z[0], &parms.s[0], &parms.r[0], 
            &parms.m[0],  &parms.odechoice[0],
+=======
+  int N=893;
+ 
+  odeparms(&N, &parms.z[0], &parms.s[0], &parms.r[0], 
+           &parms.m[0], &parms.Ipm[0],
+            &parms.ambtemp[0], &parms.HL[0],
+            &parms.HL[0], &parms.kappab[0], &parms.kappap[0],
+            &parms.V[0], &parms.depth[0], &parms.odechoice[0],
+>>>>>>> 828c798178582effcec8e552d40e5f1ece41b4f8
             &parms.sinkingchoice[0], &parms.growthchoice[0], 
             &parms.n[0]);
   
@@ -57,6 +78,7 @@ void initmod(void(* odeparms)(int *, double *,  double *, double *,
 
 struct force{
   
+<<<<<<< HEAD
   double Sal[75];
   double Temp[75];
   double Zonal[75];
@@ -73,6 +95,11 @@ struct force{
   double MicZoo[75];
   double MesZoo[75];
   
+=======
+  double k[75];
+  double temp[75];
+  double Ls[75];
+>>>>>>> 828c798178582effcec8e552d40e5f1ece41b4f8
 
   };
 
@@ -85,12 +112,17 @@ void forcc(void (* odeforcs)(int*, double*, double *, double*, double *,
                  double*, double *, double*, double *,
                  double*, double *, double *))
 {
+<<<<<<< HEAD
   int N=1126;
   odeforcs(&N, &forc.Temp[0], &forc.Sal[0],
            &forc.Zonal[0], &forc.Merid[0], &forc.VertVel[0], &forc.verdiff[0],
             &forc.DIN[0], &forc.Dchlor[0], &forc.Ndchlor[0], &forc.Dphy[0],
             &forc.NDphy[0], &forc.Det[0], &forc.Sil[0], &forc.MicZoo[0],
             &forc.MesZoo[0]);
+=======
+  int N=225;
+  odeforcs(&N, &forc.k[0], &forc.temp[75], &forc.Ls[75]);
+>>>>>>> 828c798178582effcec8e552d40e5f1ece41b4f8
   }
 
 
@@ -144,7 +176,21 @@ in C than in R. Structures are faster and less laborious to type out than macros
     /* Growth in the surface cell */
     dyn.rz[i]=parms.r[i]*y[i];
     /* */
+<<<<<<< HEAD
     
+=======
+    dyn.Stheta[i]=1-exp(-forc.temp[i]/parms.ambtemp[i]);
+    /* */
+    dyn.L[i]=forc.Ls[i]*exp(-dyn.kappa[i]*parms.z[i]);
+    /* */ 
+    dyn.Ip[i]=parms.Ipm[i]*dyn.Stheta[i];
+    /* */
+    dyn.kappa[i]=parms.kappab[i]+parms.kappap[i]*ydot[i]/parms.V[i];
+    /* */
+    dyn.Up[i]=ydot[(int)parms.n[75]+1]*dyn.Ip[i]/dyn.kappa[i]*parms.depth[i]*
+    ydot[i]/ydot[i]+(parms.V[i]*parms.Hn[i])*log((forc.Ls[i]+parms.HL[i])/
+      (forc.Ls[i]*exp((-dyn.kappa[i]*parms.depth[i])+parms.HL[i])));
+>>>>>>> 828c798178582effcec8e552d40e5f1ece41b4f8
   }
   
  /* Switching function between sinking/no sinking
