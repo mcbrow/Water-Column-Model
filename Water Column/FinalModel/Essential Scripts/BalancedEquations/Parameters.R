@@ -89,11 +89,7 @@ r<-c(rS,rep(0,length(z)-1))                  # or ... replication only at the su
 #r<-c(rep(0,length(z)-1),rS)                 # or ... replication only at the bottom
 
 
-#------------------
-# k in driving data as forcing
 
-
-#------------------
 
 
 # Comment/uncomment these lines to generate scenarios of particle mortality rate
@@ -107,16 +103,6 @@ m<-c(mS,rep(0,length(z)-1))                  # mortality only at the surface
 
 
 
-#------------------
-#------------------
-#------------------
-#------------------
 
-Ipm<-rep(1.6,74)
-HL<-rep(60,74)
-kappab<-rep(0.22, 74)
-kappap<-rep(0.008, 74)
-V<-rep(1,74)
-ambtemp<-rep(6, 74)
 
 

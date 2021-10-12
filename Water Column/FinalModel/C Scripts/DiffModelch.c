@@ -43,7 +43,7 @@ void initmod(void(* odeparms)(int *, double *,  double *, double *,
                   double *, double *, double *, double *, 
                   double *))
 {
-  int N=893;
+  int N=301;
  
   odeparms(&N, &parms.z[0], &parms.s[0], &parms.r[0], 
            &parms.m[0],  &parms.odechoice[0],
@@ -57,9 +57,22 @@ void initmod(void(* odeparms)(int *, double *,  double *, double *,
 
 struct force{
   
+  double Sal[75];
+  double Temp[75];
+  double Zonal[75];
+  double Merid[75];
+  double VertVel[75];
   double verdiff[75];
-  double temp[75];
-  double ndc[75];
+  double DIN[75];
+  double Dchlor[75];
+  double Ndchlor[75];
+  double Dphy[75];
+  double NDphy[75];
+  double Det[75];
+  double Sil[75];
+  double MicZoo[75];
+  double MesZoo[75];
+  
 
   };
 
@@ -67,10 +80,17 @@ struct force{
 
 struct force forc;
 
-void forcc(void (* odeforcs)(int*, double*, double *, double *))
+void forcc(void (* odeforcs)(int*, double*, double *, double*, double *,
+                 double*, double *, double*, double *,
+                 double*, double *, double*, double *,
+                 double*, double *, double *))
 {
-  int N=150;
-  odeforcs(&N, &forc.verdiff[0], &forc.temp[75]);
+  int N=1126;
+  odeforcs(&N, &forc.Temp[0], &forc.Sal[0],
+           &forc.Zonal[0], &forc.Merid[0], &forc.VertVel[0], &forc.verdiff[0],
+            &forc.DIN[0], &forc.Dchlor[0], &forc.Ndchlor[0], &forc.Dphy[0],
+            &forc.NDphy[0], &forc.Det[0], &forc.Sil[0], &forc.MicZoo[0],
+            &forc.MesZoo[0]);
   }
 
 
@@ -108,7 +128,7 @@ in C than in R. Structures are faster and less laborious to type out than macros
     
     
     
-  dyn.kd[i]=forc.k[i-1]/(parms.z[i-1]+parms.z[i]);
+  dyn.kd[i]=forc.verdiff[i-1]/(parms.z[i-1]+parms.z[i]);
     
     /* Vertical Diffusion Flux */
   dyn.fz[i]=dyn.kd[i]*((y[i]/parms.z[i])-(y[i-1]/parms.z[i-1]));
@@ -171,11 +191,11 @@ in C than in R. Structures are faster and less laborious to type out than macros
    this case ... = int. */
   
   
-    ydot[0]                 =    -dyn.fz[0]  +  dyn.fz[1]       -dyn.gz[0]  +        dyn.rz[0]           -dyn.md[0]*pow(y[0],2) 
+    ydot[0]                 =    -dyn.fz[0]  +  dyn.fz[1]       -dyn.gz[0]  +        dyn.rz[0]           -dyn.md[0]*pow(y[0],2) ;
   
   for(int i=1; i<(int)parms.n[0]; ++i){
     
-    ydot[i]                 =    -dyn.fz[i] +  dyn.fz[i+1]      -dyn.gz[i]  +             dyn.gz[i-1]  +               dyn.rz[i]           -dyn.md[i]*pow(y[i],2) + dyn.Up[i];
+    ydot[i]                 =    -dyn.fz[i] +  dyn.fz[i+1]      -dyn.gz[i]  +             dyn.gz[i-1]  +               dyn.rz[i]           -dyn.md[i]*pow(y[i],2) ;
   }
   
   switch((int)parms.odechoice[0]){
@@ -192,7 +212,7 @@ in C than in R. Structures are faster and less laborious to type out than macros
     
   case 2:
     
-    ydot[(int)parms.n[0]]   =   -dyn.fz[(int)parms.n[0]] +          -dyn.gz[(int)parms.n[0]] +     dyn.gz[(int)parms.n[0]-1]  +  dyn.rz[(int)parms.n[0]]  -dyn.md[(int)parms.n[0]]*pow(y[(int)parms.n[0]],2) + dyn.Up[(int)parms.n[0]];
+    ydot[(int)parms.n[0]]   =   -dyn.fz[(int)parms.n[0]] +          -dyn.gz[(int)parms.n[0]] +     dyn.gz[(int)parms.n[0]-1]  +  dyn.rz[(int)parms.n[0]]  -dyn.md[(int)parms.n[0]]*pow(y[(int)parms.n[0]],2) ;
     
     ydot[(int)parms.n[0]+1] = 0;
     
@@ -200,9 +220,9 @@ in C than in R. Structures are faster and less laborious to type out than macros
       
       
   case 3:
-    ydot[(int)parms.n[0]]   =    -dyn.fz[(int)parms.n[0]] +          -dyn.gz[(int)parms.n[0]] +     dyn.gz[(int)parms.n[0]-1]  +  dyn.rz[(int)parms.n[0]]  -dyn.md[(int)parms.n[0]]*pow(y[(int)parms.n[0]],2) + dyn.Up[(int)parms.n[0]] ;
+    ydot[(int)parms.n[0]]   =    -dyn.fz[(int)parms.n[0]] +          -dyn.gz[(int)parms.n[0]] +     dyn.gz[(int)parms.n[0]-1]  +  dyn.rz[(int)parms.n[0]]  -dyn.md[(int)parms.n[0]]*pow(y[(int)parms.n[0]],2)  ;
   
-    ydot[(int)parms.n[0]+1] =                                            dyn.gz[(int)parms.n[0]] + dyn.Up[(int)parms.n[0]+1];
+    ydot[(int)parms.n[0]+1] =                                            dyn.gz[(int)parms.n[0]] ;
     
    break;
    
