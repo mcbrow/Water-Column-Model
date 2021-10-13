@@ -38,16 +38,6 @@ Forcings<-DrivingData(IrmingerBasin)
 
 
 
-
-
-
-
-
-
-
-
-
-
 replicate_data<-function(file){ 
   obs<-nrow(file) 
 drtimes<-data.frame(file[,1],file[,2]) 
