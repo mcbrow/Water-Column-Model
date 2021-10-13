@@ -47,7 +47,8 @@ void initmod(void(* odeparms)(int *, double *,  double *, double *,
   int N=301;
  
   odeparms(&N, &parms.z[0], &parms.s[0], &parms.r[0], 
-           &parms.m[0],  &parms.odechoice[0];
+           &parms.m[0],  &parms.odechoice[0], &parms.sinkingchoice[0],
+              parms.growthchoice[0], parms.n[0]);
   
   
 }

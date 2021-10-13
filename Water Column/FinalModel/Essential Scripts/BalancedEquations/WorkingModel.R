@@ -14,7 +14,7 @@ dyn.load("DiffModelch.so")
 
 
 parms<-c(z=z[1:length(z)], s=s[1:length(s)], r=r[1:length(r)], 
-         m=m[1:length(m)], Ipm, theta0, Hn, HL, kappab, kappap, depth=NEMO,odechoice=1, sinkingchoice=1, 
+         m=m[1:length(m)], depth=NEMO,odechoice=1, sinkingchoice=1, 
          growthchoice=1, n=57)
          
 
