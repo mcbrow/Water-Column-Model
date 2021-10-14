@@ -39,12 +39,6 @@ for(i in 1:(length(NEMO)-1)){
 }	
 
 
-# Trim down z to correspond with bathymetry of driving data.
-
-# z<-z[1:length(DrivingData$Layer)	]							
-
-
-
 #cz<-(-z[1]/2)
 #for(q in (2:Nz)){
 #cz<-c(cz,cz[q-1]-+(z[q-1]/2)-(z[q]/2))

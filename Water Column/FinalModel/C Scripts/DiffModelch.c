@@ -194,7 +194,7 @@ in C than in R. Structures are faster and less laborious to type out than macros
    this case ... = int. */
   
   
-    ydot[0]                 =    -dyn.fz[0]  +  dyn.fz[1]       -dyn.gz[0]  +        dyn.rz[0]           -dyn.md[0]*pow(y[0],2)  ;
+    ydot[0]                 =    -dyn.fz[0]  +  dyn.fz[1]       -dyn.gz[0]  +        dyn.rz[0]           -dyn.md[0]*pow(y[0],2)   ;
   
   for(int i=1; i<(int)parms.n[0]; ++i){
     
