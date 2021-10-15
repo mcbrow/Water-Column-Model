@@ -12,5 +12,9 @@ get_Light  <- function(filename, date) {
   return(all)
 }
 
-get_Light("/Users/michaelbrown/Desktop/SWF_history_y1980.nc")
+
+nc<-nc_open("/Users/michael/NEMOMEDUSA/light/SWF_history_y1987.nc")
+
+
+
 

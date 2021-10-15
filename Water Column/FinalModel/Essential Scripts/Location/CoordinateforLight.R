@@ -1,4 +1,7 @@
 
+
+# Creating a dataframe with index coordinates for every permutation of geographic coordinate #
+
 nc_raw<-ncdf4::nc_open("/Users/michael/NEMOMEDUSA/light/SWF_history_y1981.nc")
 
 Long1<-nc_raw$dim$longitude$vals
