@@ -1,16 +1,45 @@
-get_Light  <- function(filename, date) {
+
+
+
+
+get_Light  <- function(filename, Lon, Lat) {
+  
+  source("/Users/michael/Desktop/PhD/Research Methods/Water Column Models/Water Column/FinalModel/Essential Scripts/Location/LightConverter.R")
+  if(Lon<0){
+    Lon=360+Lon
+  }
+  
+  temp<-FindLatLon(Lat, Lon)
   
   print(stringr::str_glue("{filename} Extracting Surface Light"))
-  nc_raw <- ncdf4::nc_open(filename)                                # Open up a netcdf file to see it's raw contents (var names)
-  nc_Surf <- ncdf4::ncvar_get(nc_raw, "surface", start=c(1021,174,1,1), count=c(1,1,-1,-1))          # Extract an array of Dissolved inorganic nitrogen
   
-  ncdf4::nc_close(nc_raw)                                                      # You must close an open netcdf file when finished to avoid data loss
   
-  all <- data.frame(                                                                # Bind as columns
-    Surface = nc_Surf
-    ) 
-  return(all)
+  
+  nc_raw <- ncdf4::nc_open(filename)                                # Check Var Names
+  nc_SWF <-ncdf4::ncvar_get(nc_raw, "SWF", start=c(temp$Long,temp$Lat,1), count=c(1,1,-1))          # Extract Light
+  
+  ncdf4::nc_close(nc_raw)                                                      # Close avoid data loss
+  
+  all<-data.frame(nc_SWF)
+  
+#  ifelse(write==TRUE || T,
+ # write.csv(all, "light.csv"),
+  #          NULL)
+  
+  
+  return(nc_SWF)
 }
 
-get_Light("/Users/michaelbrown/Desktop/SWF_history_y1980.nc")
+
+
+
+lightdata<-get_Light("/Users/michael/NEMOMEDUSA/light/SWF_rcp85_y2017.nc", -33, 61)
+
+
+
+
+
+
+
+
 

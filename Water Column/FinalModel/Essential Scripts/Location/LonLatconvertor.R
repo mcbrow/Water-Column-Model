@@ -52,11 +52,11 @@ xycoor<-function(lon, lat, path){
   DT_sf<-st_as_sf(loc, coords=c("lon", "lat"))
   DT_sf1<-st_as_sf(DT, coords=c("lon", "lat"), agr="constant")
   a<-st_join(DT_sf1, DT_sf, st_nn, k=1)
+  nc_close(nc)
   return(a)
 }
 
 xycoor(-33, 61, "/Users/michael/NEMOMEDUSA/ALLARC/1985/grid_T_19850130.nc")
 
 
-datt<-get_ptrc_T_StrathE2E("/Users/michael/NEMOMEDUSA/ALLARC/1982", 
-                           "ptrc_T_19820920.nc")
+
